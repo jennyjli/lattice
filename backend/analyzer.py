@@ -138,7 +138,9 @@ Important:
         # Detect concepts from the text
         is_oncology = any(word in text_lower for word in ["paclitaxel", "microtubule", "cancer", "carcinoma", "tumor"])
         is_staining = any(word in text_lower for word in ["h&e", "staining", "stain", "glycogen"])
-        is_temporal = any(word in text_lower for word in ["process", "step", "sequence", "then"])
+        is_chemistry = any(word in text_lower for word in ["krebs", "cycle", "oxidize", "acetyl", "nadh"])
+        is_neuroscience = any(word in text_lower for word in ["synapse", "neuron", "ltc", "plasticity", "ampa"])
+        is_photosynthesis = any(word in text_lower for word in ["photosynthesis", "light", "chloroplast"])
         
         if is_oncology:
             if "paclitaxel" in text_lower and "microtubule" in text_lower:
@@ -168,6 +170,49 @@ Important:
                     Relationship(source="H&E stain", target="cells", type="colors"),
                 ],
                 mechanisms=["glycogen dissolution", "staining reaction", "color differentiation"],
+            )
+        
+        if is_chemistry:
+            return ConceptAnalysis(
+                concept_type="metabolic_cycle",
+                recommended_visualization=["animation", "timeline"],
+                difficulty_reason="Multi-step biochemical cycle with complex energy transformations",
+                domain="chemistry",
+                entities=["Acetyl-CoA", "NADH", "FADH2", "ATP", "Krebs cycle"],
+                relationships=[
+                    Relationship(source="Acetyl-CoA", target="NADH", type="generates"),
+                    Relationship(source="NADH", target="ATP", type="drives"),
+                    Relationship(source="Krebs cycle", target="electron transport", type="feeds"),
+                ],
+                mechanisms=["oxidation", "decarboxylation", "energy capture", "electron transfer"],
+            )
+        
+        if is_neuroscience:
+            return ConceptAnalysis(
+                concept_type="cellular_mechanism",
+                recommended_visualization=["animation", "diagram"],
+                difficulty_reason="Molecular synapse mechanisms require dynamic visualization",
+                domain="neuroscience",
+                entities=["synapse", "calcium", "AMPA receptor", "membrane", "neurotransmitter"],
+                relationships=[
+                    Relationship(source="calcium", target="AMPA receptor", type="triggers"),
+                    Relationship(source="AMPA receptor", target="synapse", type="strengthens"),
+                ],
+                mechanisms=["calcium influx", "receptor insertion", "synaptic strengthening", "long-term potentiation"],
+            )
+        
+        if is_photosynthesis:
+            return ConceptAnalysis(
+                concept_type="energy_conversion",
+                recommended_visualization=["animation", "diagram"],
+                difficulty_reason="Light-energy conversion across membrane systems",
+                domain="biology",
+                entities=["light energy", "chloroplast", "thylakoid", "stroma", "glucose"],
+                relationships=[
+                    Relationship(source="light energy", target="ATP", type="generates"),
+                    Relationship(source="ATP", target="glucose", type="builds"),
+                ],
+                mechanisms=["light capture", "electron transport", "ATP synthesis", "carbon fixation"],
             )
         
         # Default fallback
