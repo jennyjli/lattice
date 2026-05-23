@@ -1,4 +1,10 @@
-# Generative Explanatory Notebook
+# Lattice
+
+**A visual notebook that explains itself.**
+
+Lattice transforms abstract knowledge into intuitive mental models by dynamically generating explanations, diagrams, animations, and interactive visualizations directly inside your notes.
+
+---
 
 ## Vision
 
@@ -9,6 +15,54 @@ The goal is NOT to summarize information.
 The goal is to transform abstract knowledge into intuitive mental models.
 
 This system should act less like a document editor and more like an adaptive explanation engine.
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Node.js 18+
+- Python 3.9+
+- npm
+
+### Run the Demo (No API Key Required)
+
+1. **Start the backend:**
+```bash
+cd backend
+/usr/bin/python3 -m pip install -r requirements.txt
+/usr/bin/python3 main.py
+```
+Backend runs on `http://localhost:8000`
+
+2. **Start the frontend (in a new terminal):**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Frontend runs on `http://localhost:3001`
+
+3. **Try an example concept:**
+
+Open http://localhost:3001 and paste this into the editor:
+
+> "Paclitaxel stabilizes microtubules by preventing their depolymerization, which inhibits the mitotic spindle and prevents cancer cell division."
+
+Click **Generate Explanation** and watch as Lattice:
+- Analyzes the concept
+- Plans a visualization strategy
+- Renders an animated explanation
+
+### Test All Domains
+
+Run the test suite to validate across oncology, chemistry, neuroscience, and biology:
+
+```bash
+python3 test_pipeline.py
+```
+
+See [EXAMPLES.md](EXAMPLES.md) for more sample concepts to try.
 
 ---
 
@@ -390,4 +444,21 @@ Focus on:
 
 ## Status
 
-This repository currently contains the project proposal and MVP build plan for the Generative Explanatory Notebook.
+✅ **MVP Complete** - Core pipeline working end-to-end!
+
+- Concept analyzer with multi-domain support
+- Visualization planner with 5 visualization types
+- SVG renderer with CSS animations
+- Frontend editor with live preview
+- Full test suite with 5 domain examples
+
+See [STATUS.md](STATUS.md) for detailed implementation report and next steps.
+
+---
+
+## Documentation
+
+- [STATUS.md](STATUS.md) – MVP completion status & architecture
+- [DEVELOPMENT.md](DEVELOPMENT.md) – Detailed build plan & tasks
+- [EXAMPLES.md](EXAMPLES.md) – Try these concepts in the editor
+- [API Docs](http://localhost:8000/docs) – Auto-generated Swagger (when running)
