@@ -117,6 +117,471 @@ NOT like:
 
 ---
 
+## Product Vision
+
+Lattice is an AI-native contextual understanding system.
+
+Its purpose is not merely to store information or summarize content.
+
+Its purpose is to help humans rapidly build accurate mental models in environments with:
+
+- high information density
+- fast-changing context
+- hidden assumptions
+- fragmented knowledge
+- dynamic terminology
+- complex systems
+
+Lattice dynamically generates:
+
+- explanations
+- context
+- visual intuition
+- organizational memory
+- conceptual bridges
+- interactive understanding interfaces
+
+The core belief behind Lattice:
+
+Humans do not lack information.
+They lack context, structure, and intuition.
+
+### The Core Problem
+
+Modern work and learning environments increasingly suffer from:
+
+- context fragmentation
+- hidden organizational knowledge
+- unexplained terminology
+- rapidly shifting project directions
+- overwhelming information density
+- passive note-taking systems
+
+People often:
+
+- hear unfamiliar terms in meetings
+- encounter concepts they cannot visualize
+- struggle to connect fragmented information
+- feel afraid to ask questions
+- lose understanding as systems evolve
+
+Traditional tools fail because they assume:
+
+- information retrieval = understanding
+- summaries = comprehension
+- static documents can represent dynamic systems
+
+They cannot actively build mental models.
+
+### What Lattice Actually Is
+
+Lattice is not:
+
+- an AI chatbot
+- a note-taking app
+- a meeting summarizer
+- enterprise search
+- a knowledge graph tool
+
+Lattice is:
+
+- a generative interface for understanding.
+
+The system continuously detects:
+
+- what context the user may be missing
+- what concepts are difficult to intuitively understand
+- what hidden relationships matter
+- what historical evolution is relevant
+
+Then dynamically generates the best explanatory interface for the situation.
+
+Depending on context, this may include:
+
+- visual diagrams
+- animations
+- timelines
+- project summaries
+- conceptual maps
+- causal explanations
+- historical context
+- relationship graphs
+- interactive simulations
+
+---
+
+## Milestones
+
+### PHASE 1 — Explanatory Notes
+
+Goal:
+
+Help users understand difficult concepts while learning.
+
+This phase focuses on:
+
+- biology
+- medicine
+- chemistry
+- technical learning
+
+Core capability:
+Text → explanatory visualization generation.
+
+Example:
+User writes:
+
+> “Paclitaxel stabilizes microtubules.”
+
+Lattice generates:
+
+- animated mitosis diagram
+- drug interaction explanation
+- side effect explanation
+- simplified mental model
+
+#### Milestone 1 — AI Explanation Detection
+
+Build:
+
+A system that identifies:
+
+- concepts difficult to understand from text alone
+- dynamic processes
+- spatial relationships
+- abstract terminology
+- microscopic structures
+
+Output:
+
+Structured explanation opportunities.
+
+Example:
+
+```json
+{
+  "concept": "microtubule stabilization",
+  "visualization_needed": true,
+  "recommended_format": [
+    "animation",
+    "comparison"
+  ]
+}
+```
+
+#### Milestone 2 — Visualization Planning Engine
+
+Build:
+
+An intermediate reasoning layer between:
+text → visualization
+
+The planner determines:
+
+- what the user likely struggles to understand
+- what explanation style best fits
+- what scenes/components should exist
+
+This becomes the cognitive core of Lattice.
+
+#### Milestone 3 — Generative Explanation Blocks
+
+Build:
+
+Inline generated:
+
+- diagrams
+- animations
+- interactive explanatory UI
+
+embedded directly into notes.
+
+The notebook becomes:
+
+a living explanatory surface.
+
+### PHASE 2 — Dynamic Knowledge Understanding
+
+Goal:
+
+Help users connect concepts across time and domains.
+
+The notebook evolves from:
+static notes
+→ dynamic conceptual systems.
+
+#### Milestone 4 — Semantic Context Layer
+
+Build:
+
+Persistent concept memory.
+
+Track:
+
+- entities
+- relationships
+- repeated concepts
+- evolving understanding
+- historical context
+
+The system begins constructing:
+
+- conceptual continuity
+- personalized understanding state
+
+#### Milestone 5 — Cross-Note Context Generation
+
+Build:
+
+Automatic conceptual linking across notes.
+
+Example:
+A new note mentions:
+
+> “ARID1A mutation”
+
+Lattice automatically connects:
+
+- prior notes
+- treatment discussions
+- related pathways
+- previous explanations
+
+The user no longer manually organizes knowledge.
+
+The system organizes understanding dynamically.
+
+### PHASE 3 — Ambient Organizational Context
+
+Goal:
+
+Help people navigate high-context work environments.
+
+This expands Lattice from:
+learning system
+→ organizational cognition system.
+
+#### Milestone 6 — Meeting Context Detection
+
+Build:
+
+Real-time detection of:
+
+- unfamiliar project names
+- acronyms
+- systems
+- organizational references
+
+During meetings, Lattice identifies:
+
+“This term may lack sufficient context.”
+
+#### Milestone 7 — Context Synthesis Engine
+
+Build:
+
+Automatic organizational context generation.
+
+When a project is mentioned:
+Lattice retrieves:
+
+- relevant docs
+- ownership
+- recent decisions
+- historical direction changes
+- recent discussions
+
+Then synthesizes:
+
+- “Apollo in 30 seconds”
+- timeline of changes
+- why the project matters now
+- latest strategic shift
+
+This is NOT retrieval.
+
+This is:
+
+contextual synthesis.
+
+#### Milestone 8 — Living Organizational Memory
+
+Build:
+
+Dynamic organizational understanding.
+
+The system continuously updates:
+
+- project evolution
+- terminology meaning
+- team structure
+- strategic direction
+- recurring decision patterns
+
+The organization develops:
+
+a continuously evolving memory layer.
+
+### PHASE 4 — Adaptive Cognitive Interfaces
+
+Goal:
+
+Generate interfaces dynamically based on user understanding gaps.
+
+This is where Lattice becomes truly AI-native.
+
+#### Milestone 9 — User Understanding Modeling
+
+Build:
+
+Models of:
+
+- user confusion patterns
+- prior knowledge
+- preferred explanation styles
+- expertise level
+- learning progression
+
+Lattice adapts explanations automatically.
+
+Different users receive:
+
+- different visualizations
+- different abstraction levels
+- different context depth
+
+#### Milestone 10 — Generative Interface Engine
+
+Build:
+
+An engine that dynamically chooses:
+
+- diagrams
+- timelines
+- simulations
+- conversational explanations
+- visual comparisons
+- organizational maps
+
+based on:
+
+- concept type
+- cognitive difficulty
+- current user context
+
+The interface itself becomes AI-generated.
+
+### PHASE 5 — Cognitive Operating System
+
+Goal:
+
+Transform Lattice into a universal understanding layer.
+
+At this stage:
+Lattice is no longer a notebook.
+
+It becomes:
+
+- a cognitive interface between humans and complex systems.
+
+Potential domains:
+
+- education
+- medicine
+- enterprise
+- research
+- engineering
+- law
+- finance
+- scientific discovery
+
+---
+
+## North Star
+
+### Long-Term Vision
+
+Lattice helps humans understand complex systems as naturally as they understand physical space.
+
+The ultimate goal is:
+
+reducing the cognitive friction between humans and complexity.
+
+Lattice should make:
+
+- hidden structures visible
+- evolving systems understandable
+- organizational memory accessible
+- abstract concepts intuitive
+- contextual understanding ambient
+
+### Ultimate Product Philosophy
+
+Current software gives humans:
+
+- documents
+- search
+- dashboards
+- summaries
+
+Lattice gives humans:
+
+- dynamically generated understanding.
+
+### North Star User Experience
+
+A user enters:
+
+- a meeting
+- a research field
+- a medical journey
+- a technical system
+- a new organization
+
+Instead of slowly accumulating fragmented context over months,
+Lattice continuously generates:
+
+- explanations
+- historical synthesis
+- visual intuition
+- conceptual bridges
+- missing context
+
+The user feels:
+
+“I understand what’s happening.”
+
+not:
+
+“I found the information.”
+
+That is the core difference.
+
+### The Fundamental Shift
+
+Traditional software optimizes:
+
+- storage
+- retrieval
+- productivity
+
+Lattice optimizes:
+
+- comprehension
+- intuition
+- contextual awareness
+- mental model formation
+
+It is a shift from:
+
+information systems
+
+to:
+
+understanding systems.
+
+---
+
 ## Example User Flow
 
 ### Histopathology
