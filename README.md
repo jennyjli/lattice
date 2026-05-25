@@ -736,11 +736,21 @@ Potential rendering approaches:
 - HTML/CSS animations
 - Canvas/WebGL
 - Lottie animations
-- AI image generation
+- AI image generation (Google Gemini Ultra / OpenAI fallback)
 - hybrid procedural + AI generation
 
 Preferred MVP:
 SVG + HTML animation for controllability.
+
+### Image Generation Roadmap
+
+Lattice uses a hybrid rendering strategy to move from proof-of-concept SVG to richer visuals:
+
+- Tier 1: Gemini-assisted image prompts and diagram generation
+- Tier 2: Procedural SVG / HTML fallback for reliable rendering
+- Tier 3: Interactive 3D and scientific model viewers
+
+Use `GEMINI_API_KEY` and `IMAGE_GEN_PROVIDER=gemini` for the current image generation flow.
 
 ### 5. Inline Embedding
 

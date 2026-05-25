@@ -55,6 +55,8 @@ class PlanRequest(BaseModel):
 
 class RenderRequest(BaseModel):
     plan: VisualizationPlan
+    concept_text: Optional[str] = None
+    analysis_data: Optional[dict] = None
 
 
 class GenerateRequest(BaseModel):
@@ -118,14 +120,18 @@ async def plan(request: PlanRequest) -> VisualizationPlan:
 @app.post("/render")
 async def render(request: RenderRequest) -> dict:
     """
-    Render a visualization plan as SVG.
+    Render a visualization plan as SVG or AI image.
     
     Returns:
-    - SVG string ready for inline embedding
+    - HTML/SVG string ready for inline embedding
     """
     try:
-        svg = renderer.render(request.plan)
-        return {"svg": svg}
+        rendered = renderer.render(
+            request.plan,
+            concept_text=request.concept_text or "",
+            analysis_data=request.analysis_data or {},
+        )
+        return {"svg": rendered}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Rendering failed: {str(e)}")
 
@@ -144,8 +150,10 @@ async def generate(request: GenerateRequest) -> dict:
         # Step 2: Plan
         plan = planner.plan(analysis)
         
-        # Step 3: Render
-        svg = renderer.render(plan)
+        # Step 3: Render with concept text and analysis data for image generation
+        # Convert analysis to dict for passing to renderer
+        analysis_dict = analysis.dict() if hasattr(analysis, 'dict') else analysis
+        svg = renderer.render(plan, concept_text=request.text, analysis_data=analysis_dict)
         
         return {
             "analysis": analysis,

@@ -10,6 +10,11 @@ OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
 GEMINI_API_KEY=...
 
+# Image Generation
+ENABLE_IMAGE_GENERATION=True
+IMAGE_GEN_PROVIDER=gemini  # Options: gemini, openai
+IMAGE_SIZE=512x512
+
 # Server Configuration
 HOST=0.0.0.0
 PORT=8000

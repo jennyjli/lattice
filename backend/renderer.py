@@ -2,23 +2,31 @@
 SVG rendering module.
 
 Converts visualization plans into SVG + HTML/CSS animations.
+Integrates with AI image generation when available.
 """
 
 from planner import VisualizationPlan
+from image_gen import image_gen
+from config import ENABLE_IMAGE_GENERATION
 import json
 from typing import List
 
 
 class SVGRenderer:
     """
-    Renders visualization plans as SVG graphics with optional HTML/CSS animations.
+    Renders visualization plans with multiple strategies:
     
-    This is the MVP rendering approach for controllability and consistency.
+    1. AI Image Generation (Gemini) - when enabled and available
+    2. Procedural SVG - fallback with shapes and animations
+    3. Description Cards - minimal fallback when nothing else works
+    
+    This hybrid approach ensures quality visualizations with graceful degradation.
     """
 
     def __init__(self):
         self.svg_width = 600
         self.svg_height = 400
+        self.enable_image_gen = ENABLE_IMAGE_GENERATION
         self.colors = {
             "bg": "#f0f9ff",
             "primary": "#0ea5e9",
@@ -30,16 +38,70 @@ class SVGRenderer:
             "text_light": "#075985",
         }
 
-    def render(self, plan: VisualizationPlan) -> str:
+    def render(self, plan: VisualizationPlan, concept_text: str = "", analysis_data: dict = {}) -> str:
         """
-        Render a visualization plan as SVG.
+        Render a visualization plan with multiple fallback strategies.
 
         Args:
             plan: VisualizationPlan from planner
+            concept_text: Original concept text for image generation prompts
+            analysis_data: Analysis data for image generation context
 
         Returns:
-            SVG string ready for embedding
+            HTML/SVG string ready for embedding
         """
+        # Strategy 1: Try AI image generation
+        if self.enable_image_gen and concept_text:
+            image_html = self._try_image_generation(
+                concept_text, plan, analysis_data
+            )
+            if image_html:
+                return image_html
+        
+        # Strategy 2: Fall back to procedural SVG
+        svg_result = self._render_svg(plan)
+        if svg_result:
+            return svg_result
+        
+        # Strategy 3: Fall back to description card
+        fallback_concepts = []
+        if isinstance(analysis_data, dict):
+            fallback_concepts = analysis_data.get('entities', []) or analysis_data.get('mechanisms', [])
+        elif isinstance(analysis_data, list):
+            fallback_concepts = analysis_data
+        return self._render_fallback_card(plan, fallback_concepts)
+
+    def _try_image_generation(
+        self, concept_text: str, plan: VisualizationPlan, analysis_data: dict
+    ) -> str:
+        """Try to generate an AI image for the concept."""
+        try:
+            image_base64 = image_gen.generate_image(
+                concept=concept_text,
+                concept_type=analysis_data.get("concept_type", "general"),
+                domain=analysis_data.get("domain", "general"),
+                mechanisms=analysis_data.get("mechanisms", []),
+                style=plan.style,
+            )
+            
+            if image_base64:
+                # Wrap image with metadata
+                return f"""
+                <div class="visualization-block" style="text-align: center; margin: 16px 0;">
+                    {image_gen.generate_html_embed(image_base64)}
+                    <p style="font-size: 12px; color: #0284c7; margin-top: 8px;">
+                        ✨ AI-generated scientific diagram
+                    </p>
+                </div>
+                """
+            
+            return None
+        except Exception as e:
+            print(f"Image generation failed: {e}")
+            return None
+
+    def _render_svg(self, plan: VisualizationPlan) -> str:
+        """Render procedural SVG visualization."""
         if plan.visualization_type == "animation":
             return self._render_animation(plan)
         elif plan.visualization_type == "comparison":
@@ -50,6 +112,25 @@ class SVGRenderer:
             return self._render_interactive(plan)
         else:  # diagram
             return self._render_diagram(plan)
+
+    def _render_fallback_card(self, plan: VisualizationPlan, concepts: List[str] = None) -> str:
+        """Render a description card as last-resort fallback"""
+        if concepts is None:
+            concepts = []
+        
+        # Build description from plan
+        description = plan.annotations.get('description', 'Visualization explanation')
+        concept_text = ', '.join(concepts[:3]) if concepts else 'General concept'
+        
+        html = f"""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 24px; border-radius: 8px; color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+            <div style="font-size: 18px; font-weight: 600; margin-bottom: 12px;">📋 Explanation</div>
+            <div style="font-size: 14px; line-height: 1.6; margin-bottom: 16px;">{description}</div>
+            <div style="font-size: 12px; opacity: 0.9;"><strong>Concepts:</strong> {concept_text}</div>
+            <div style="font-size: 11px; margin-top: 12px; opacity: 0.7;">✨ AI-generated explanatory note</div>
+        </div>
+        """
+        return html
 
     def _render_diagram(self, plan: VisualizationPlan) -> str:
         """Render a static diagram with labeled components"""

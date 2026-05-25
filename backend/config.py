@@ -21,3 +21,8 @@ DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
 # Frontend Configuration
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
+# Image Generation Configuration
+ENABLE_IMAGE_GENERATION = os.getenv('ENABLE_IMAGE_GENERATION', 'True').lower() == 'true'
+IMAGE_GEN_PROVIDER = os.getenv('IMAGE_GEN_PROVIDER', 'gemini')  # 'gemini' or 'openai'
+IMAGE_SIZE = os.getenv('IMAGE_SIZE', '512x512')
