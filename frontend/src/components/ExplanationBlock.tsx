@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ExplanationBlock as ExplanationBlockType } from '@/types';
+import ThreeDViewer from './ThreeDViewer';
 
 interface Props {
   block: ExplanationBlockType;
@@ -19,7 +20,9 @@ export default function ExplanationBlock({ block }: Props) {
       {/* Visualization Placeholder */}
       <div className="p-6">
         <div className="mb-4 bg-brand-50 rounded-lg p-6 border border-brand-200 min-h-64">
-          {block.rendered_svg ? (
+          {block.plan.visualization_type === '3d' && block.plan.scene_data ? (
+            <ThreeDViewer sceneData={block.plan.scene_data} />
+          ) : block.rendered_svg ? (
             <div
               className="w-full"
               dangerouslySetInnerHTML={{ __html: block.rendered_svg }}

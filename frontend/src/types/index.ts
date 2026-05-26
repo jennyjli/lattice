@@ -18,12 +18,42 @@ export interface Relationship {
   type: string;
 }
 
+export interface SceneObject {
+  id: string;
+  label: string;
+  type: string;
+  position: [number, number, number];
+  radius?: number;
+  color?: [number, number, number];
+}
+
+export interface SceneRelationship {
+  source: string;
+  target: string;
+  type: string;
+}
+
+export interface SceneData {
+  objects: SceneObject[];
+  relationships?: SceneRelationship[];
+  camera?: {
+    position: [number, number, number];
+    target: [number, number, number];
+  };
+  metadata?: {
+    domain?: string;
+    concept_type?: string;
+    style?: string;
+  };
+}
+
 export interface VisualizationPlan {
-  visualization_type: 'diagram' | 'animation' | 'comparison' | 'timeline' | 'interactive';
+  visualization_type: 'diagram' | 'animation' | 'comparison' | 'timeline' | 'interactive' | '3d';
   scenes: string[];
   style: string;
   guide?: string;
   annotations?: Annotation[];
+  scene_data?: SceneData;
 }
 
 export interface Annotation {
