@@ -11,6 +11,7 @@ import google.generativeai as genai
 from openai import OpenAI
 from config import (
     GEMINI_API_KEY,
+    GEMINI_IMAGE_MODEL,
     OPENAI_API_KEY,
     IMAGE_GEN_PROVIDER,
     IMAGE_SIZE,
@@ -31,17 +32,27 @@ class ImageGenerator:
         self.provider = IMAGE_GEN_PROVIDER.lower()
         self.gemini_available = False
         self.openai_available = bool(OPENAI_API_KEY)
-        self.openai_client = OpenAI(api_key=OPENAI_API_KEY) if self.openai_available else None
+        self.openai_client = None
 
-        if self.provider == "gemini" and GEMINI_API_KEY:
-            try:
-                genai.configure(api_key=GEMINI_API_KEY)
-                self.gemini_model = genai.generative_models.GenerativeModel("gemini-pro-vision")
-                self.gemini_available = True
-                print("✅ Gemini prompt generation initialized")
-            except Exception as e:
-                print(f"⚠️  Gemini initialization failed: {e}")
-                self.gemini_available = False
+        if self.provider == "openai":
+            if self.openai_available:
+                self.openai_client = OpenAI(api_key=OPENAI_API_KEY)
+                print("✅ OpenAI image generation initialized")
+            else:
+                print("⚠️  OpenAI image provider selected but OPENAI_API_KEY is missing. Image generation unavailable.")
+
+        if self.provider == "gemini":
+            if GEMINI_API_KEY:
+                try:
+                    genai.configure(api_key=GEMINI_API_KEY)
+                    self.gemini_model = genai.generative_models.GenerativeModel(GEMINI_IMAGE_MODEL)
+                    self.gemini_available = True
+                    print(f"✅ Gemini image generation initialized using model {GEMINI_IMAGE_MODEL}")
+                except Exception as e:
+                    print(f"⚠️  Gemini initialization failed: {e}")
+                    self.gemini_available = False
+            else:
+                print("⚠️  Gemini image provider selected but GEMINI_API_KEY is missing. Image generation unavailable.")
 
     def generate_image(
         self,
@@ -62,17 +73,9 @@ class ImageGenerator:
             image_data = self._try_gemini_image(prompt)
             if image_data:
                 return self._encode_image(image_data)
-
-            if self.openai_available:
-                refined_prompt = self._refine_prompt_with_gemini(prompt) or prompt
-                return self._generate_openai_image(refined_prompt)
-
             return None
 
         if self.provider == "openai" and self.openai_available:
-            return self._generate_openai_image(prompt)
-
-        if self.openai_available:
             return self._generate_openai_image(prompt)
 
         return None
@@ -141,7 +144,7 @@ Return a prompt suitable for image generation or a direct image asset if support
                 "Keep instructions concise, visual, and clear for a model that can render diagrams.\n\n"
                 f"{prompt}"
             )
-            result = genai.generate_text(model="gemini-pro", prompt=rewrite_prompt)
+            result = genai.generate_text(model=GEMINI_TEXT_MODEL, prompt=rewrite_prompt)
             if result and getattr(result, 'text', None):
                 return result.text.strip()
         except Exception as error:

@@ -8,9 +8,10 @@ from pydantic import BaseModel
 from typing import Optional
 import json
 import os
+import google.generativeai as genai
 from openai import OpenAI
 
-from config import OPENAI_API_KEY, MODEL_NAME
+from config import OPENAI_API_KEY, MODEL_NAME, LLM_PROVIDER, GEMINI_API_KEY, GEMINI_TEXT_MODEL
 
 
 class Relationship(BaseModel):
@@ -41,9 +42,35 @@ class ConceptAnalyzer:
     """
 
     def __init__(self):
-        """Initialize OpenAI client"""
-        self.client = OpenAI(api_key=OPENAI_API_KEY)
+        """Initialize the configured LLM client."""
+        self.llm_provider = LLM_PROVIDER.lower()
         self.model = MODEL_NAME
+        self.gemini_available = False
+        self.openai_available = bool(OPENAI_API_KEY)
+        self.client = None
+
+        if self.llm_provider == "gemini" and GEMINI_API_KEY:
+            try:
+                genai.configure(api_key=GEMINI_API_KEY)
+                self.gemini_available = True
+                print("✅ Gemini analysis initialized")
+            except Exception as e:
+                print(f"⚠️  Gemini analysis initialization failed: {e}")
+                self.gemini_available = False
+
+        if self.llm_provider != "gemini":
+            if self.openai_available:
+                self.client = OpenAI(api_key=OPENAI_API_KEY)
+            elif self.llm_provider == "openai" and GEMINI_API_KEY:
+                print(
+                    "⚠️  OpenAI provider selected but OPENAI_API_KEY is missing or invalid. "
+                    "Set LLM_PROVIDER=gemini to use Gemini instead."
+                )
+            else:
+                print(
+                    "⚠️  OpenAI provider selected but OPENAI_API_KEY is missing or invalid. "
+                    "Analysis will use demo analysis."
+                )
 
     def analyze(self, text: str) -> ConceptAnalysis:
         """
@@ -55,11 +82,18 @@ class ConceptAnalyzer:
         Returns:
             ConceptAnalysis with structure and recommendations
         """
-        # Check if API key is valid - if not, use fallback demo analysis
-        if not OPENAI_API_KEY or OPENAI_API_KEY == "sk_test_placeholder":
+        # If configured for Gemini, use Gemini for analysis.
+        if self.llm_provider == "gemini":
+            if not self.gemini_available:
+                print("⚠️  Gemini API key not configured or unavailable. Using demo analysis.")
+                return self._demo_analysis(text)
+            return self._analyze_with_gemini(text)
+
+        # Otherwise use OpenAI or fallback demo analysis.
+        if not self.openai_available:
             print("⚠️  OpenAI API key not configured. Using demo analysis.")
             return self._demo_analysis(text)
-        
+
         prompt = f"""Analyze the following scientific/medical concept for educational explanation opportunities.
 
 Text: "{text}"
@@ -125,6 +159,65 @@ Important:
             return self._demo_analysis(text)
         except Exception as e:
             print(f"Error during analysis: {e}")
+            return self._demo_analysis(text)
+
+    def _analyze_with_gemini(self, text: str) -> ConceptAnalysis:
+        prompt = f"""Analyze the following scientific/medical concept for educational explanation opportunities.
+
+Text: \"{text}\"
+
+Return a JSON object with this exact structure:
+{{
+  \"concept_type\": \"string (e.g., 'cellular_process', 'chemical_reaction', 'spatial_structure', 'temporal_process', 'mechanism')\",
+  \"recommended_visualization\": [\"array of strings from: 'diagram', 'animation', 'comparison', 'timeline', 'interactive'\"],
+  \"difficulty_reason\": \"string explaining why this concept is hard to visualize\",
+  \"domain\": \"string (e.g., 'oncology', 'chemistry', 'neuroscience', 'biology', 'physics')\",
+  \"entities\": [\"array of key entities/terms\"],
+  \"relationships\": [
+    {{\"source\": \"entity1\", \"target\": \"entity2\", \"type\": \"relationship_type\"}},
+    ...
+  ],
+  \"mechanisms\": [\"array of processes/mechanisms described\"]
+}}
+
+Important:
+- Be specific and concrete
+- Focus on visualization opportunities
+- Prioritize what's HARD to understand from text alone
+- Keep entities and mechanisms concise"""
+
+        try:
+            response = genai.generate_text(
+                model=GEMINI_TEXT_MODEL,
+                prompt=prompt,
+                temperature=0.7,
+                max_output_tokens=1000,
+            )
+            response_text = getattr(response, 'text', '')
+            analysis_data = json.loads(response_text)
+
+            relationships = [
+                Relationship(**rel) for rel in analysis_data.get("relationships", [])
+            ]
+
+            return ConceptAnalysis(
+                concept_type=analysis_data.get("concept_type", "general"),
+                recommended_visualization=analysis_data.get(
+                    "recommended_visualization", ["diagram"]
+                ),
+                difficulty_reason=analysis_data.get(
+                    "difficulty_reason", "Complex concept"
+                ),
+                domain=analysis_data.get("domain", "general"),
+                entities=analysis_data.get("entities", []),
+                relationships=relationships,
+                mechanisms=analysis_data.get("mechanisms", []),
+            )
+        except json.JSONDecodeError as e:
+            print(f"Failed to parse Gemini response as JSON: {e}")
+            return self._demo_analysis(text)
+        except Exception as e:
+            print(f"Gemini analysis failed: {e}")
             return self._demo_analysis(text)
 
     def _demo_analysis(self, text: str) -> ConceptAnalysis:

@@ -4,11 +4,13 @@ Set your API keys and preferences in a `.env` file:
 
 ```bash
 # LLM Configuration
-LLM_PROVIDER=openai  # Options: openai, anthropic, gemini
+LLM_PROVIDER=gemini  # Options: openai, anthropic, gemini
 MODEL_NAME=gpt-4
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
 GEMINI_API_KEY=...
+GEMINI_TEXT_MODEL=models/gemini-pro
+GEMINI_IMAGE_MODEL=models/gemini-pro-vision
 
 # Image Generation
 ENABLE_IMAGE_GENERATION=True
