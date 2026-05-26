@@ -101,7 +101,7 @@ Text: "{text}"
 Return a JSON object with this exact structure:
 {{
   "concept_type": "string (e.g., 'cellular_process', 'chemical_reaction', 'spatial_structure', 'temporal_process', 'mechanism')",
-  "recommended_visualization": ["array of strings from: 'diagram', 'animation', 'comparison', 'timeline', 'interactive'"],
+  "recommended_visualization": ["array of strings from: 'diagram', 'animation', 'comparison', 'timeline', 'interactive', '3d'"],
   "difficulty_reason": "string explaining why this concept is hard to visualize",
   "domain": "string (e.g., 'oncology', 'chemistry', 'neuroscience', 'biology', 'physics')",
   "entities": ["array of key entities/terms"],
@@ -169,7 +169,7 @@ Text: \"{text}\"
 Return a JSON object with this exact structure:
 {{
   \"concept_type\": \"string (e.g., 'cellular_process', 'chemical_reaction', 'spatial_structure', 'temporal_process', 'mechanism')\",
-  \"recommended_visualization\": [\"array of strings from: 'diagram', 'animation', 'comparison', 'timeline', 'interactive'\"],
+  \"recommended_visualization\": [\"array of strings from: 'diagram', 'animation', 'comparison', 'timeline', 'interactive', '3d'\"],
   \"difficulty_reason\": \"string explaining why this concept is hard to visualize\",
   \"domain\": \"string (e.g., 'oncology', 'chemistry', 'neuroscience', 'biology', 'physics')\",
   \"entities\": [\"array of key entities/terms\"],
@@ -184,7 +184,8 @@ Important:
 - Be specific and concrete
 - Focus on visualization opportunities
 - Prioritize what's HARD to understand from text alone
-- Keep entities and mechanisms concise"""
+- Keep entities and mechanisms concise
+- If the concept describes spatial or 3D structure, recommend [\"3d\"] or [\"spatial\"] when appropriate"""
 
         try:
             response = genai.generate_text(

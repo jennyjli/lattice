@@ -50,6 +50,10 @@ class SVGRenderer:
         Returns:
             HTML/SVG string ready for embedding
         """
+        # Strategy 0: Handle 3D spatial plans first
+        if plan.visualization_type == "3d":
+            return self._render_3d(plan)
+
         # Strategy 1: Try AI image generation
         if self.enable_image_gen and concept_text:
             image_html = self._try_image_generation(
@@ -417,3 +421,19 @@ class SVGRenderer:
 </svg>"""
         
         return svg
+
+    def _render_3d(self, plan: VisualizationPlan) -> str:
+        """Render a 3D scene payload as an embeddable HTML container."""
+        scene_data = plan.scene_data or {}
+        scene_json = json.dumps(scene_data, ensure_ascii=False)
+
+        html = f"""
+        <div class=\"visualization-3d\" style=\"padding:16px; background:#f8fafc; border-radius:10px; border:1px solid #dbeafe;\">
+          <div style=\"font-size:16px; font-weight:700; color:#0f172a; margin-bottom:8px;\">3D Spatial Visualization</div>
+          <div style=\"font-size:13px; color:#475569; margin-bottom:12px;\">Interactive 3D scene data is available for a spatial viewer.</div>
+          <script type=\"application/json\" id=\"lattice-3d-scene\">{scene_json}</script>
+          <pre style=\"white-space:pre-wrap; word-break:break-word; font-size:12px; color:#334155; background:#ffffff; border:1px solid #e2e8f0; padding:12px; border-radius:8px; overflow:auto; max-height:260px;\">{json.dumps(scene_data, indent=2, ensure_ascii=False)}</pre>
+        </div>
+        """
+
+        return html
