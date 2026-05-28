@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 import json
 import os
-import google.generativeai as genai
+from google import genai
 from openai import OpenAI
 
 from config import OPENAI_API_KEY, MODEL_NAME, LLM_PROVIDER, GEMINI_API_KEY, GEMINI_TEXT_MODEL
@@ -46,12 +46,13 @@ class ConceptAnalyzer:
         self.llm_provider = LLM_PROVIDER.lower()
         self.model = MODEL_NAME
         self.gemini_available = False
+        self.gemini_client = None
         self.openai_available = bool(OPENAI_API_KEY)
         self.client = None
 
         if self.llm_provider == "gemini" and GEMINI_API_KEY:
             try:
-                genai.configure(api_key=GEMINI_API_KEY)
+                self.gemini_client = genai.Client(api_key=GEMINI_API_KEY)
                 self.gemini_available = True
                 print("✅ Gemini analysis initialized")
             except Exception as e:
@@ -188,14 +189,17 @@ Important:
 - If the concept describes spatial or 3D structure, recommend [\"3d\"] or [\"spatial\"] when appropriate"""
 
         try:
-            response = genai.generate_text(
+            response = self.gemini_client.models.generate_content(
                 model=GEMINI_TEXT_MODEL,
-                prompt=prompt,
-                temperature=0.7,
-                max_output_tokens=1000,
+                contents=prompt,
             )
-            response_text = getattr(response, 'text', '')
-            analysis_data = json.loads(response_text)
+            response_text = response.text.strip()
+            # Strip markdown code fences if Gemini wraps the JSON
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+            analysis_data = json.loads(response_text.strip())
 
             relationships = [
                 Relationship(**rel) for rel in analysis_data.get("relationships", [])

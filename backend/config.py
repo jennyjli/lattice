@@ -10,8 +10,8 @@ if OPENAI_API_KEY == 'sk_test_placeholder':
     OPENAI_API_KEY = ''
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
-GEMINI_TEXT_MODEL = os.getenv('GEMINI_TEXT_MODEL', 'models/gemini-pro')
-GEMINI_IMAGE_MODEL = os.getenv('GEMINI_IMAGE_MODEL', 'models/gemini-pro-vision')
+GEMINI_TEXT_MODEL = os.getenv('GEMINI_TEXT_MODEL', 'gemini-2.5-flash')
+GEMINI_IMAGE_MODEL = os.getenv('GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image')
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
 
 # Preferred LLM provider (options: 'openai', 'anthropic', 'gemini')
