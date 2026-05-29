@@ -6,7 +6,6 @@ Converts concept analysis into concrete visual explanation plans.
 
 from pydantic import BaseModel
 from typing import Any, Optional, Literal
-import json
 from analyzer import ConceptAnalysis
 
 
@@ -174,41 +173,48 @@ class VisualizationPlanner:
         return annotations
 
     def _plan_scene_data(self, analysis: ConceptAnalysis, viz_type: str) -> Optional[dict[str, Any]]:
-        """Build structured scene data for 3D visualizations."""
+        """Build particle-based scene data for 3D visualizations."""
         if viz_type != "3d":
             return None
 
-        objects = []
-        base_positions = [(-80, 0, 0), (80, 20, 0), (0, -70, 0), (-50, 80, 0), (60, -40, 0)]
+        visual = getattr(analysis, "visual_profile", None) or {}
+        primary_color = visual.get("primary_color", "#64b5f6")
+        secondary_color = visual.get("secondary_color", "#90caf9")
+        form = visual.get("form", "cloud")
+        visual_notes = visual.get("visual_notes", "")
 
-        for idx, entity in enumerate(analysis.entities[:5]):
-            x, y, z = base_positions[idx]
-            size = 30 - idx * 4
-            objects.append({
-                "id": f"obj_{idx+1}",
-                "label": entity.replace('_', ' ').title(),
-                "type": "sphere",
+        cluster_positions = [(0, 0, 0), (-170, 30, -20), (165, -25, 10), (-95, 150, -10), (120, -130, 0)]
+        cluster_colors = [primary_color, secondary_color, primary_color, secondary_color, primary_color]
+        particle_counts = [50000, 28000, 22000, 18000, 15000]
+        radii = [95, 58, 52, 46, 40]
+
+        entities = analysis.entities[:5] if analysis.entities else [analysis.concept_type]
+        clusters = []
+        for idx, entity in enumerate(entities):
+            x, y, z = cluster_positions[idx]
+            clusters.append({
+                "id": f"cluster_{idx}",
+                "label": entity.replace("_", " ").title(),
                 "position": [x, y, z],
-                "radius": max(size, 12),
-                "color": [100 + idx * 20, 150 - idx * 10, 220 - idx * 15],
+                "particle_count": particle_counts[idx],
+                "radius": radii[idx],
+                "form": form if idx == 0 else "cloud",
+                "primary_color": cluster_colors[idx],
+                "glow_intensity": round(1.0 - idx * 0.08, 2),
             })
 
-        relationships = [
-            {"source": rel.source, "target": rel.target, "type": rel.type}
-            for rel in analysis.relationships[:4]
-        ]
-
         return {
-            "objects": objects,
-            "relationships": relationships,
+            "render_mode": "particles",
+            "background": "#030303",
+            "clusters": clusters,
             "camera": {
-                "position": [0, 0, 300],
+                "position": [0, 0, 520],
                 "target": [0, 0, 0],
             },
             "metadata": {
                 "domain": analysis.domain,
                 "concept_type": analysis.concept_type,
-                "style": self._select_style(analysis),
+                "visual_notes": visual_notes,
             },
         }
 

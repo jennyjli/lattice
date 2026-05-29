@@ -10,12 +10,31 @@ export interface ConceptAnalysis {
   entities: string[];
   relationships: Relationship[];
   mechanisms: string[];
+  visual_profile?: VisualProfile;
+}
+
+export interface VisualProfile {
+  primary_color: string;
+  secondary_color: string;
+  form: 'spherical' | 'cloud' | 'branching' | 'helical' | 'planar' | 'crystalline' | 'elongated';
+  visual_notes: string;
 }
 
 export interface Relationship {
   source: string;
   target: string;
   type: string;
+}
+
+export interface ParticleCluster {
+  id: string;
+  label: string;
+  position: [number, number, number];
+  particle_count: number;
+  radius: number;
+  form: 'spherical' | 'cloud' | 'branching' | 'helical' | 'planar' | 'crystalline' | 'elongated';
+  primary_color: string;
+  glow_intensity?: number;
 }
 
 export interface SceneObject {
@@ -34,7 +53,12 @@ export interface SceneRelationship {
 }
 
 export interface SceneData {
-  objects: SceneObject[];
+  // Particle rendering (new)
+  render_mode?: 'particles';
+  background?: string;
+  clusters?: ParticleCluster[];
+  // Legacy sphere rendering
+  objects?: SceneObject[];
   relationships?: SceneRelationship[];
   camera?: {
     position: [number, number, number];
@@ -44,6 +68,7 @@ export interface SceneData {
     domain?: string;
     concept_type?: string;
     style?: string;
+    visual_notes?: string;
   };
 }
 

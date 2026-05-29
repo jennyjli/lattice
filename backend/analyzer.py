@@ -28,6 +28,7 @@ class ConceptAnalysis(BaseModel):
     entities: list[str]
     relationships: list[Relationship]
     mechanisms: list[str]
+    visual_profile: Optional[dict] = None
 
 
 class ConceptAnalyzer:
@@ -110,7 +111,13 @@ Return a JSON object with this exact structure:
     {{"source": "entity1", "target": "entity2", "type": "relationship_type"}},
     ...
   ],
-  "mechanisms": ["array of processes/mechanisms described"]
+  "mechanisms": ["array of processes/mechanisms described"],
+  "visual_profile": {{
+    "primary_color": "#hex - the most visually characteristic color of this concept as glowing particles on a dark background (e.g. #FFD700 for ginkgo/autumn leaves, #F8C8DC for cherry blossoms, #4FC3F7 for water/DNA, #90EE90 for plant cells, #BA68C8 for neurons). Choose bright/vivid colors that glow well.",
+    "secondary_color": "#hex - complementary accent color",
+    "form": "one of: spherical (cells, atoms, planets), cloud (trees, nebulae, general), branching (trees, neurons, fractals), helical (DNA, proteins, spirals), planar (membranes, discs, orbits), crystalline (minerals, lattices), elongated (muscle fibers, spores, rods)",
+    "visual_notes": "3-8 word evocative description of what this looks like"
+  }}
 }}
 
 Important:
@@ -154,6 +161,7 @@ Important:
                 entities=analysis_data.get("entities", []),
                 relationships=relationships,
                 mechanisms=analysis_data.get("mechanisms", []),
+                visual_profile=analysis_data.get("visual_profile", None),
             )
         except json.JSONDecodeError as e:
             print(f"Failed to parse LLM response as JSON: {e}")
@@ -178,7 +186,13 @@ Return a JSON object with this exact structure:
     {{\"source\": \"entity1\", \"target\": \"entity2\", \"type\": \"relationship_type\"}},
     ...
   ],
-  \"mechanisms\": [\"array of processes/mechanisms described\"]
+  \"mechanisms\": [\"array of processes/mechanisms described\"],
+  \"visual_profile\": {{
+    \"primary_color\": \"#hex - the most visually characteristic color of this concept as glowing particles on a dark background (e.g. #FFD700 for ginkgo/autumn, #F8C8DC for cherry blossom, #4FC3F7 for water/DNA, #90EE90 for plant cells, #BA68C8 for neurons). Choose bright/vivid colors that glow well.\",
+    \"secondary_color\": \"#hex - complementary accent color\",
+    \"form\": \"one of: spherical (cells, atoms, planets), cloud (trees, nebulae, general), branching (trees, neurons, fractals), helical (DNA, proteins, spirals), planar (membranes, discs, orbits), crystalline (minerals, lattices), elongated (muscle fibers, spores, rods)\",
+    \"visual_notes\": \"3-8 word evocative description of what this looks like\"
+  }}
 }}
 
 Important:
@@ -217,6 +231,7 @@ Important:
                 entities=analysis_data.get("entities", []),
                 relationships=relationships,
                 mechanisms=analysis_data.get("mechanisms", []),
+                visual_profile=analysis_data.get("visual_profile", None),
             )
         except json.JSONDecodeError as e:
             print(f"Failed to parse Gemini response as JSON: {e}")
