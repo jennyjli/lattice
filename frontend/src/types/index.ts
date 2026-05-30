@@ -57,6 +57,7 @@ export interface SceneData {
   render_mode?: 'particles';
   background?: string;
   clusters?: ParticleCluster[];
+  reference_image_url?: string;
   // Legacy sphere rendering
   objects?: SceneObject[];
   relationships?: SceneRelationship[];

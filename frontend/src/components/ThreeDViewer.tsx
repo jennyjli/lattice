@@ -135,8 +135,9 @@ export default function ThreeDViewer({ sceneData }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rendererRef  = useRef<THREE.WebGLRenderer | null>(null);
 
-  const isParticleMode = sceneData.render_mode === 'particles';
-  const visualNotes    = sceneData.metadata?.visual_notes;
+  const isParticleMode   = sceneData.render_mode === 'particles';
+  const visualNotes      = sceneData.metadata?.visual_notes;
+  const referenceImage   = sceneData.reference_image_url;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -267,7 +268,19 @@ export default function ThreeDViewer({ sceneData }: Props) {
         <div className="text-sm font-semibold text-[#e2e8f0]">Particle Visualization</div>
         <div className="text-xs text-[#94a3b8] mt-0.5">Drag to rotate · Scroll to zoom</div>
       </div>
-      <div ref={containerRef} className="w-full h-[480px]" />
+      <div className="relative">
+        <div ref={containerRef} className="w-full h-[480px]" />
+        {referenceImage && (
+          <div className="absolute bottom-3 left-3 flex flex-col items-start gap-1">
+            <span className="text-[10px] text-[#475569] uppercase tracking-wider">Source</span>
+            <img
+              src={referenceImage}
+              alt="reference"
+              className="w-20 h-20 object-cover rounded-lg border border-[#1e2a3a] opacity-70 hover:opacity-100 transition-opacity"
+            />
+          </div>
+        )}
+      </div>
       {visualNotes && (
         <div className="px-4 py-2 border-t border-[#1a1a2e] bg-[#080818]">
           <p className="text-xs text-[#64748b] italic">{visualNotes}</p>

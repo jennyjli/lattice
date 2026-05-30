@@ -35,32 +35,24 @@ class VisualizationPlanner:
     def __init__(self):
         pass
 
-    def plan(self, analysis: ConceptAnalysis) -> VisualizationPlan:
+    def plan(self, analysis: ConceptAnalysis, research_data: Optional[dict] = None) -> VisualizationPlan:
         """
         Create a visualization plan from concept analysis.
 
         Args:
             analysis: ConceptAnalysis from the analyzer
+            research_data: Optional web research result from WebResearcher
 
         Returns:
             VisualizationPlan with scenes, annotations, and rendering guide
         """
-        # Choose visualization type
         viz_type = self._choose_visualization_type(analysis)
-        
-        # Plan scenes based on the type
         scenes = self._plan_scenes(analysis, viz_type)
-        
-        # Generate annotations
         annotations = self._generate_annotations(analysis)
-        
-        # Select visual style based on domain
         style = self._select_style(analysis)
-        
-        # Create rendering guide and scene data
         guide = self._create_guide(analysis, viz_type)
-        scene_data = self._plan_scene_data(analysis, viz_type)
-        
+        scene_data = self._plan_scene_data(analysis, viz_type, research_data)
+
         return VisualizationPlan(
             visualization_type=viz_type,
             scenes=scenes,
@@ -172,7 +164,7 @@ class VisualizationPlanner:
         
         return annotations
 
-    def _plan_scene_data(self, analysis: ConceptAnalysis, viz_type: str) -> Optional[dict[str, Any]]:
+    def _plan_scene_data(self, analysis: ConceptAnalysis, viz_type: str, research_data: Optional[dict] = None) -> Optional[dict[str, Any]]:
         """Build particle-based scene data for 3D visualizations."""
         if viz_type != "3d":
             return None
@@ -182,6 +174,17 @@ class VisualizationPlanner:
         secondary_color = visual.get("secondary_color", "#90caf9")
         form = visual.get("form", "cloud")
         visual_notes = visual.get("visual_notes", "")
+
+        # Override colors with web-extracted values when available — real image grounding
+        reference_image_url = None
+        if research_data and research_data.get("found"):
+            if research_data.get("dominant_color"):
+                primary_color = research_data["dominant_color"]
+            if research_data.get("secondary_color"):
+                secondary_color = research_data["secondary_color"]
+            reference_image_url = research_data.get("image_url")
+            if research_data.get("description") and not visual_notes:
+                visual_notes = research_data["description"][:120]
 
         cluster_positions = [(0, 0, 0), (-170, 30, -20), (165, -25, 10), (-95, 150, -10), (120, -130, 0)]
         cluster_colors = [primary_color, secondary_color, primary_color, secondary_color, primary_color]
@@ -203,7 +206,7 @@ class VisualizationPlanner:
                 "glow_intensity": round(1.0 - idx * 0.08, 2),
             })
 
-        return {
+        scene: dict[str, Any] = {
             "render_mode": "particles",
             "background": "#030303",
             "clusters": clusters,
@@ -217,6 +220,9 @@ class VisualizationPlanner:
                 "visual_notes": visual_notes,
             },
         }
+        if reference_image_url:
+            scene["reference_image_url"] = reference_image_url
+        return scene
 
     def _select_style(self, analysis: ConceptAnalysis) -> str:
         """Select visual style based on domain and complexity"""

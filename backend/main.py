@@ -18,6 +18,7 @@ from config import HOST, PORT, DEBUG, FRONTEND_URL
 from analyzer import ConceptAnalyzer, ConceptAnalysis
 from planner import VisualizationPlanner, VisualizationPlan
 from renderer import SVGRenderer
+from web_researcher import WebResearcher
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -39,6 +40,7 @@ app.add_middleware(
 analyzer = ConceptAnalyzer()
 planner = VisualizationPlanner()
 renderer = SVGRenderer()
+web_researcher = WebResearcher()
 
 
 # ============================================================================
@@ -146,13 +148,18 @@ async def generate(request: GenerateRequest) -> dict:
     try:
         # Step 1: Analyze
         analysis = analyzer.analyze(request.text)
-        
-        # Step 2: Plan
-        plan = planner.plan(analysis)
-        
-        # Step 3: Render with concept text and analysis data for image generation
-        # Convert analysis to dict for passing to renderer
-        analysis_dict = analysis.dict() if hasattr(analysis, 'dict') else analysis
+
+        # Step 2: Web research — fetch real image + extract colors for 3D particle grounding
+        research_data = {}
+        if "3d" in analysis.recommended_visualization or "spatial" in analysis.recommended_visualization:
+            query = web_researcher.get_search_query(request.text, analysis.entities)
+            research_data = web_researcher.search_concept(query)
+
+        # Step 3: Plan (research_data may override particle colors with real image colors)
+        plan = planner.plan(analysis, research_data=research_data)
+
+        # Step 4: Render
+        analysis_dict = analysis.model_dump()
         svg = renderer.render(plan, concept_text=request.text, analysis_data=analysis_dict)
         
         return {

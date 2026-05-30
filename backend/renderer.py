@@ -6,8 +6,6 @@ Integrates with AI image generation when available.
 """
 
 from planner import VisualizationPlan
-from image_gen import image_gen
-from config import ENABLE_IMAGE_GENERATION
 import json
 from typing import List
 
@@ -26,7 +24,6 @@ class SVGRenderer:
     def __init__(self):
         self.svg_width = 600
         self.svg_height = 400
-        self.enable_image_gen = ENABLE_IMAGE_GENERATION
         self.colors = {
             "bg": "#f0f9ff",
             "primary": "#0ea5e9",
@@ -38,71 +35,24 @@ class SVGRenderer:
             "text_light": "#075985",
         }
 
-    def render(self, plan: VisualizationPlan, concept_text: str = "", analysis_data: dict = {}) -> str:
+    def render(self, plan: VisualizationPlan, concept_text: str = "", analysis_data: dict = {}) -> str:  # noqa: ARG002
         """
-        Render a visualization plan with multiple fallback strategies.
-
-        Args:
-            plan: VisualizationPlan from planner
-            concept_text: Original concept text for image generation prompts
-            analysis_data: Analysis data for image generation context
+        Render a visualization plan.
 
         Returns:
             HTML/SVG string ready for embedding
         """
-        # Strategy 0: Handle 3D spatial plans first
         if plan.visualization_type == "3d":
             return self._render_3d(plan)
 
-        # Strategy 1: Try AI image generation
-        if self.enable_image_gen and concept_text:
-            image_html = self._try_image_generation(
-                concept_text, plan, analysis_data
-            )
-            if image_html:
-                return image_html
-        
-        # Strategy 2: Fall back to procedural SVG
         svg_result = self._render_svg(plan)
         if svg_result:
             return svg_result
-        
-        # Strategy 3: Fall back to description card
+
         fallback_concepts = []
         if isinstance(analysis_data, dict):
-            fallback_concepts = analysis_data.get('entities', []) or analysis_data.get('mechanisms', [])
-        elif isinstance(analysis_data, list):
-            fallback_concepts = analysis_data
+            fallback_concepts = analysis_data.get("entities", []) or analysis_data.get("mechanisms", [])
         return self._render_fallback_card(plan, fallback_concepts)
-
-    def _try_image_generation(
-        self, concept_text: str, plan: VisualizationPlan, analysis_data: dict
-    ) -> str:
-        """Try to generate an AI image for the concept."""
-        try:
-            image_base64 = image_gen.generate_image(
-                concept=concept_text,
-                concept_type=analysis_data.get("concept_type", "general"),
-                domain=analysis_data.get("domain", "general"),
-                mechanisms=analysis_data.get("mechanisms", []),
-                style=plan.style,
-            )
-            
-            if image_base64:
-                # Wrap image with metadata
-                return f"""
-                <div class="visualization-block" style="text-align: center; margin: 16px 0;">
-                    {image_gen.generate_html_embed(image_base64)}
-                    <p style="font-size: 12px; color: #0284c7; margin-top: 8px;">
-                        ✨ AI-generated scientific diagram
-                    </p>
-                </div>
-                """
-            
-            return None
-        except Exception as e:
-            print(f"Image generation failed: {e}")
-            return None
 
     def _render_svg(self, plan: VisualizationPlan) -> str:
         """Render procedural SVG visualization."""
@@ -163,7 +113,6 @@ class SVGRenderer:
         # Add entity boxes
         num_annotations = len(plan.annotations) if plan.annotations else 0
         cols = min(3, max(1, num_annotations))
-        rows = (num_annotations + cols - 1) // cols
         
         box_width = 140
         box_height = 80
@@ -359,7 +308,7 @@ class SVGRenderer:
         
         return svg
 
-    def _render_interactive(self, plan: VisualizationPlan) -> str:
+    def _render_interactive(self, plan: VisualizationPlan) -> str:  # noqa: ARG002
         """Render interactive simulation template"""
         svg = f"""<svg width="{self.svg_width}" height="{self.svg_height}" xmlns="http://www.w3.org/2000/svg">
   <!-- Background -->
