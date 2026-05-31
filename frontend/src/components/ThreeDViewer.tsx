@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { SceneData, ParticleCluster } from '@/types';
+import { exportVisualizationAsHTML } from '@/utils/exportHTML';
 
 function createGlowTexture(): THREE.Texture {
   const size = 64;
@@ -135,9 +136,13 @@ export default function ThreeDViewer({ sceneData }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rendererRef  = useRef<THREE.WebGLRenderer | null>(null);
 
-  const isParticleMode   = sceneData.render_mode === 'particles';
-  const visualNotes      = sceneData.metadata?.visual_notes;
-  const referenceImage   = sceneData.reference_image_url;
+  const isParticleMode = sceneData.render_mode === 'particles';
+  const visualNotes    = sceneData.metadata?.visual_notes;
+  const referenceImage = sceneData.reference_image_url;
+
+  const handleExport = useCallback(() => {
+    exportVisualizationAsHTML(sceneData);
+  }, [sceneData]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -264,9 +269,19 @@ export default function ThreeDViewer({ sceneData }: Props) {
 
   return (
     <div className="rounded-xl border border-[#1a1a2e] bg-[#030303] overflow-hidden shadow-lg">
-      <div className="px-4 py-3 border-b border-[#1a1a2e] bg-[#080818]">
-        <div className="text-sm font-semibold text-[#e2e8f0]">Particle Visualization</div>
-        <div className="text-xs text-[#94a3b8] mt-0.5">Drag to rotate · Scroll to zoom</div>
+      <div className="px-4 py-3 border-b border-[#1a1a2e] bg-[#080818] flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold text-[#e2e8f0]">Particle Visualization</div>
+          <div className="text-xs text-[#94a3b8] mt-0.5">Drag to rotate · Scroll to zoom</div>
+        </div>
+        {isParticleMode && (
+          <button
+            onClick={handleExport}
+            className="text-xs px-3 py-1.5 rounded-md border border-[#2a2a4e] text-[#94a3b8] hover:text-[#e2e8f0] hover:border-[#4a4a7e] transition-colors"
+          >
+            Export HTML
+          </button>
+        )}
       </div>
       <div className="relative">
         <div ref={containerRef} className="w-full h-[480px]" />
