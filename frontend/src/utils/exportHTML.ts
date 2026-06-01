@@ -180,6 +180,12 @@ function buildHTML({ sceneData, conceptLabel, visualNotes, refImage }: BuildOpts
               color: #1e293b; z-index: 10; }
     #credit { position: fixed; top: 18px; left: 20px; font-size: 11px;
               color: #1e293b; z-index: 10; }
+    #tooltip { display: none; position: fixed; pointer-events: none;
+               padding: 4px 10px; font-size: 12px; font-weight: 500;
+               color: #e2e8f0; background: #0f172a;
+               border: 1px solid #2a2a4e; border-radius: 6px;
+               box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+               white-space: nowrap; z-index: 100; }
   </style>
 </head>
 <body>
@@ -192,6 +198,7 @@ function buildHTML({ sceneData, conceptLabel, visualNotes, refImage }: BuildOpts
   ${refHTML}
   <div id="hint">Drag to rotate &nbsp;·&nbsp; Scroll to zoom</div>
   <div id="credit">Made with Lattice</div>
+  <div id="tooltip"></div>
 
   <script type="importmap">
     {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/"}}
@@ -245,6 +252,7 @@ function buildHTML({ sceneData, conceptLabel, visualNotes, refImage }: BuildOpts
 
       const glowTex       = createGlowTexture();
       const particleGroup = new THREE.Group();
+      const clusterMeshes = [];
 
       if (SCENE_DATA.render_mode === 'particles') {
         (SCENE_DATA.clusters ?? []).forEach(cluster => {
@@ -274,10 +282,43 @@ function buildHTML({ sceneData, conceptLabel, visualNotes, refImage }: BuildOpts
             transparent: true, opacity: 0.82, depthWrite: false,
           });
 
-          particleGroup.add(new THREE.Points(geo, mat));
+          const mesh = new THREE.Points(geo, mat);
+          clusterMeshes.push({ points: mesh, label: cluster.label ?? '' });
+          particleGroup.add(mesh);
         });
       }
       scene.add(particleGroup);
+
+      // Hover labels via raycasting
+      if (clusterMeshes.length > 0) {
+        const raycaster = new THREE.Raycaster();
+        raycaster.params.Points = { threshold: 15 };
+        const mouse   = new THREE.Vector2();
+        const tooltip = document.getElementById('tooltip');
+
+        renderer.domElement.addEventListener('mousemove', (e) => {
+          const rect = renderer.domElement.getBoundingClientRect();
+          mouse.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+          mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+          raycaster.setFromCamera(mouse, camera);
+          const hits = raycaster.intersectObjects(clusterMeshes.map(c => c.points), false);
+          if (hits.length > 0) {
+            const hit = clusterMeshes.find(c => c.points === hits[0].object);
+            if (hit && tooltip) {
+              tooltip.textContent  = hit.label;
+              tooltip.style.left   = (e.clientX + 14) + 'px';
+              tooltip.style.top    = (e.clientY - 10) + 'px';
+              tooltip.style.display = 'block';
+            }
+          } else if (tooltip) {
+            tooltip.style.display = 'none';
+          }
+        });
+
+        renderer.domElement.addEventListener('mouseleave', () => {
+          if (tooltip) tooltip.style.display = 'none';
+        });
+      }
 
       (function animate() {
         requestAnimationFrame(animate);

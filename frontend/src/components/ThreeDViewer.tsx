@@ -135,6 +135,7 @@ interface Props {
 export default function ThreeDViewer({ sceneData }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rendererRef  = useRef<THREE.WebGLRenderer | null>(null);
+  const tooltipRef   = useRef<HTMLDivElement | null>(null);
 
   const isParticleMode = sceneData.render_mode === 'particles';
   const visualNotes    = sceneData.metadata?.visual_notes;
@@ -175,6 +176,7 @@ export default function ThreeDViewer({ sceneData }: Props) {
 
     const toDispose: Array<THREE.BufferGeometry | THREE.Material | THREE.Texture> = [];
     const particleGroup = new THREE.Group();
+    const clusterMeshes: Array<{ points: THREE.Points; label: string }> = [];
 
     if (isParticleMode) {
       const glowTex = createGlowTexture();
@@ -191,7 +193,6 @@ export default function ThreeDViewer({ sceneData }: Props) {
           basePos[i * 3]     += cx;
           basePos[i * 3 + 1] += cy;
           basePos[i * 3 + 2] += cz;
-          // Slight per-particle color variation for organic feel
           const v = (Math.random() - 0.5) * 0.12;
           colors[i * 3]     = Math.min(1, Math.max(0, base.r + v));
           colors[i * 3 + 1] = Math.min(1, Math.max(0, base.g + v));
@@ -215,7 +216,9 @@ export default function ThreeDViewer({ sceneData }: Props) {
         });
         toDispose.push(mat);
 
-        particleGroup.add(new THREE.Points(geo, mat));
+        const mesh = new THREE.Points(geo, mat);
+        clusterMeshes.push({ points: mesh, label: cluster.label });
+        particleGroup.add(mesh);
       });
 
       scene.add(particleGroup);
@@ -239,6 +242,47 @@ export default function ThreeDViewer({ sceneData }: Props) {
       });
     }
 
+    // Raycaster for cluster hover labels
+    let removeRaycaster: (() => void) | null = null;
+    if (isParticleMode && clusterMeshes.length > 0) {
+      const raycaster = new THREE.Raycaster();
+      raycaster.params.Points = { threshold: 15 };
+      const mouse = new THREE.Vector2();
+
+      const onMouseMove = (e: MouseEvent) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+        mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        const hits = raycaster.intersectObjects(clusterMeshes.map((c) => c.points), false);
+        const tip = tooltipRef.current;
+        if (!tip) return;
+        if (hits.length > 0) {
+          const hit = clusterMeshes.find((c) => c.points === hits[0].object);
+          if (hit) {
+            tip.textContent = hit.label;
+            tip.style.left    = `${e.clientX - rect.left + 14}px`;
+            tip.style.top     = `${e.clientY - rect.top  - 10}px`;
+            tip.style.display = 'block';
+          }
+        } else {
+          tip.style.display = 'none';
+        }
+      };
+
+      const onMouseLeave = () => {
+        if (tooltipRef.current) tooltipRef.current.style.display = 'none';
+      };
+
+      renderer.domElement.addEventListener('mousemove', onMouseMove);
+      renderer.domElement.addEventListener('mouseleave', onMouseLeave);
+      removeRaycaster = () => {
+        renderer.domElement.removeEventListener('mousemove', onMouseMove);
+        renderer.domElement.removeEventListener('mouseleave', onMouseLeave);
+      };
+    }
+
     let frameId: number;
     const animate = () => {
       controls.update();
@@ -260,6 +304,7 @@ export default function ThreeDViewer({ sceneData }: Props) {
     return () => {
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', handleResize);
+      removeRaycaster?.();
       controls.dispose();
       toDispose.forEach((d) => d.dispose());
       renderer.dispose();
@@ -285,6 +330,11 @@ export default function ThreeDViewer({ sceneData }: Props) {
       </div>
       <div className="relative">
         <div ref={containerRef} className="w-full h-[480px]" />
+        {/* Hover label tooltip — positioned by raycaster in absolute coords */}
+        <div
+          ref={tooltipRef}
+          className="absolute pointer-events-none hidden px-2.5 py-1 text-xs font-medium text-[#e2e8f0] bg-[#0f172a] border border-[#2a2a4e] rounded-md shadow-lg whitespace-nowrap"
+        />
         {referenceImage && (
           <div className="absolute bottom-3 left-3 flex flex-col items-start gap-1">
             <span className="text-[10px] text-[#475569] uppercase tracking-wider">Source</span>
