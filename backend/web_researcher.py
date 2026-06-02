@@ -63,10 +63,18 @@ class WebResearcher:
         else:
             print(f"🔍 Web research: no Wikipedia image for {query!r}")
 
-        # Always fetch reference images from Wikimedia Commons (independent of Wikipedia)
+        # Fetch reference images from Wikimedia Commons
         result["reference_images"] = self.search_multiple_images(query, limit=4)
-        print(f"🖼  Reference images: {len(result['reference_images'])} found")
 
+        # Supplement with iNaturalist when Commons returns fewer than 2 results
+        if len(result["reference_images"]) < 2:
+            needed = 4 - len(result["reference_images"])
+            inat = self.search_inaturalist(query, limit=needed)
+            result["reference_images"].extend(inat)
+            if inat:
+                print(f"🌿 iNaturalist fallback: +{len(inat)} images for {query!r}")
+
+        print(f"🖼  Reference images total: {len(result['reference_images'])}")
         return result
 
     def search_multiple_images(self, query: str, limit: int = 4) -> list[dict]:
@@ -124,6 +132,55 @@ class WebResearcher:
 
         except Exception as e:
             print(f"Wikimedia image search failed for {query!r}: {e}")
+            return []
+
+    def search_inaturalist(self, query: str, limit: int = 4) -> list[dict]:
+        """
+        Search iNaturalist taxa for biological / botanical organism photos.
+
+        Returns the `default_photo` of the top matching taxa — each is a
+        verified, research-grade representative photo. Only useful for
+        organisms; returns [] gracefully for abstract concepts.
+        """
+        try:
+            r = httpx.get(
+                "https://api.inaturalist.org/v1/taxa",
+                params={
+                    "q": query,
+                    "photos": "true",
+                    "per_page": str(limit),
+                    "rank": "species,genus,family,order",
+                },
+                timeout=self.timeout,
+            )
+            if r.status_code != 200:
+                return []
+
+            images: list[dict] = []
+            for taxon in r.json().get("results", []):
+                # High observation_count is a reliable proxy for "real, well-documented
+                # organism" — filters out spurious text matches (e.g. Badnavirus for "DNA").
+                if taxon.get("observations_count", 0) < 10_000:
+                    continue
+                photo = taxon.get("default_photo") or {}
+                square_url = photo.get("square_url", "")
+                if not square_url:
+                    continue
+                # Replace 'square' (75 px) with 'small' (~240 px) for more detail.
+                thumb = square_url.replace("/square.", "/small.")
+                name = taxon.get("preferred_common_name") or taxon.get("name", "")
+                images.append({
+                    "thumb_url": thumb,
+                    "title": f"{name} — iNaturalist",
+                    "page_url": f"https://www.inaturalist.org/taxa/{taxon['id']}",
+                })
+                if len(images) >= limit:
+                    break
+
+            return images
+
+        except Exception as e:
+            print(f"iNaturalist search failed for {query!r}: {e}")
             return []
 
     # ── Wikipedia helpers ──────────────────────────────────────────────────────
