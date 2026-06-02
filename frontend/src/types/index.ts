@@ -26,6 +26,12 @@ export interface Relationship {
   type: string;
 }
 
+export interface ReferenceImage {
+  thumb_url: string;
+  title: string;
+  page_url: string;
+}
+
 export interface ParticleCluster {
   id: string;
   label: string;
@@ -58,6 +64,7 @@ export interface SceneData {
   background?: string;
   clusters?: ParticleCluster[];
   reference_image_url?: string;
+  reference_images?: ReferenceImage[];
   // Legacy sphere rendering
   objects?: SceneObject[];
   relationships?: SceneRelationship[];

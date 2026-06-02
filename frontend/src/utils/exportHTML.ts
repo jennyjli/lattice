@@ -116,7 +116,8 @@ export function exportVisualizationAsHTML(sceneData: SceneData): void {
   const visualNotes  = sceneData.metadata?.visual_notes ?? '';
   const refImage     = sceneData.reference_image_url ?? '';
 
-  const html = buildHTML({ sceneData, conceptLabel, visualNotes, refImage });
+  const refImages = sceneData.reference_images ?? [];
+  const html = buildHTML({ sceneData, conceptLabel, visualNotes, refImage, refImages });
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
 
@@ -136,9 +137,10 @@ interface BuildOpts {
   conceptLabel: string;
   visualNotes:  string;
   refImage:     string;
+  refImages:    Array<{ thumb_url: string; title: string; page_url: string }>;
 }
 
-function buildHTML({ sceneData, conceptLabel, visualNotes, refImage }: BuildOpts): string {
+function buildHTML({ sceneData, conceptLabel, visualNotes, refImage, refImages }: BuildOpts): string {
   const sceneJSON = JSON.stringify(sceneData);
 
   const refHTML = refImage
@@ -147,6 +149,13 @@ function buildHTML({ sceneData, conceptLabel, visualNotes, refImage }: BuildOpts
 
   const notesHTML = visualNotes
     ? `<p id="notes">${escapeHTML(visualNotes)}</p>`
+    : '';
+
+  const imagesHTML = refImages.length > 0
+    ? `<div id="source-images">
+    <p id="source-label">Source Images</p>
+    ${refImages.map(img => `<a href="${img.page_url}" target="_blank" rel="noopener noreferrer" title="${escapeHTML(img.title)}"><img src="${img.thumb_url}" alt="${escapeHTML(img.title)}" /></a>`).join('\n    ')}
+  </div>`
     : '';
 
   return `<!DOCTYPE html>
@@ -186,6 +195,15 @@ function buildHTML({ sceneData, conceptLabel, visualNotes, refImage }: BuildOpts
                border: 1px solid #2a2a4e; border-radius: 6px;
                box-shadow: 0 4px 12px rgba(0,0,0,0.5);
                white-space: nowrap; z-index: 100; }
+    #source-images { position: fixed; bottom: 20px; right: 20px;
+                     z-index: 10; text-align: right; }
+    #source-label { font-size: 10px; color: #334155; text-transform: uppercase;
+                    letter-spacing: 0.06em; margin-bottom: 6px; }
+    #source-images a { display: inline-block; margin-left: 6px; }
+    #source-images img { width: 56px; height: 56px; object-fit: cover;
+                         border-radius: 6px; border: 1px solid #1e293b;
+                         opacity: 0.5; transition: opacity 0.2s; vertical-align: top; }
+    #source-images img:hover { opacity: 1; }
   </style>
 </head>
 <body>
@@ -196,6 +214,7 @@ function buildHTML({ sceneData, conceptLabel, visualNotes, refImage }: BuildOpts
     ${notesHTML}
   </div>
   ${refHTML}
+  ${imagesHTML}
   <div id="hint">Drag to rotate &nbsp;·&nbsp; Scroll to zoom</div>
   <div id="credit">Made with Lattice</div>
   <div id="tooltip"></div>

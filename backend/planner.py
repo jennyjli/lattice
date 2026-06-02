@@ -177,14 +177,17 @@ class VisualizationPlanner:
 
         # Override colors with web-extracted values when available — real image grounding
         reference_image_url = None
-        if research_data and research_data.get("found"):
-            if research_data.get("dominant_color"):
-                primary_color = research_data["dominant_color"]
-            if research_data.get("secondary_color"):
-                secondary_color = research_data["secondary_color"]
-            reference_image_url = research_data.get("image_url")
-            if research_data.get("description") and not visual_notes:
-                visual_notes = research_data["description"][:120]
+        reference_images: list = []
+        if research_data:
+            if research_data.get("found"):
+                if research_data.get("dominant_color"):
+                    primary_color = research_data["dominant_color"]
+                if research_data.get("secondary_color"):
+                    secondary_color = research_data["secondary_color"]
+                reference_image_url = research_data.get("image_url")
+                if research_data.get("description") and not visual_notes:
+                    visual_notes = research_data["description"][:120]
+            reference_images = research_data.get("reference_images", [])
 
         cluster_positions = [(0, 0, 0), (-170, 30, -20), (165, -25, 10), (-95, 150, -10), (120, -130, 0)]
         cluster_colors = [primary_color, secondary_color, primary_color, secondary_color, primary_color]
@@ -222,6 +225,8 @@ class VisualizationPlanner:
         }
         if reference_image_url:
             scene["reference_image_url"] = reference_image_url
+        if reference_images:
+            scene["reference_images"] = reference_images
         return scene
 
     def _select_style(self, analysis: ConceptAnalysis) -> str:

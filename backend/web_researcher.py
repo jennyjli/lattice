@@ -27,23 +27,25 @@ class WebResearcher:
 
     def search_concept(self, query: str) -> dict:
         """
-        Search Wikipedia for the concept and return image + extracted colors.
+        Search Wikipedia + Wikimedia Commons for the concept.
 
         Returns:
             {
                 found: bool,
-                image_url: str | None,
-                dominant_color: str | None,   # hex, boosted for dark background
+                image_url: str | None,          # Wikipedia thumbnail (for color extraction)
+                dominant_color: str | None,      # hex, boosted for dark background
                 secondary_color: str | None,
                 description: str,
+                reference_images: list[dict],    # Wikimedia Commons image results
             }
         """
-        result = {
+        result: dict = {
             "found": False,
             "image_url": None,
             "dominant_color": None,
             "secondary_color": None,
             "description": "",
+            "reference_images": [],
         }
 
         image_url, description = self._wikipedia_summary(query)
@@ -59,9 +61,70 @@ class WebResearcher:
             result["secondary_color"] = secondary
             print(f"🔍 Web research found: {query!r} → colors {dominant}, {secondary}")
         else:
-            print(f"🔍 Web research: no image found for {query!r}")
+            print(f"🔍 Web research: no Wikipedia image for {query!r}")
+
+        # Always fetch reference images from Wikimedia Commons (independent of Wikipedia)
+        result["reference_images"] = self.search_multiple_images(query, limit=4)
+        print(f"🖼  Reference images: {len(result['reference_images'])} found")
 
         return result
+
+    def search_multiple_images(self, query: str, limit: int = 4) -> list[dict]:
+        """
+        Search Wikimedia Commons for photographic reference images.
+
+        Returns a list of { thumb_url, title, page_url } dicts, skipping SVGs
+        and sorting by the search relevance rank returned by the API.
+        """
+        try:
+            r = httpx.get(
+                "https://commons.wikimedia.org/w/api.php",
+                params={
+                    "action": "query",
+                    "generator": "search",
+                    "gsrnamespace": "6",        # File namespace
+                    "gsrsearch": query,
+                    "gsrlimit": str(min(limit * 3, 20)),
+                    "prop": "imageinfo",
+                    "iiprop": "url|mime",
+                    "iiurlwidth": "320",
+                    "format": "json",
+                },
+                timeout=self.timeout,
+            )
+            if r.status_code != 200:
+                return []
+
+            pages = r.json().get("query", {}).get("pages", {}).values()
+            # Sort by API-assigned index (relevance rank)
+            sorted_pages = sorted(pages, key=lambda p: p.get("index", 9999))
+
+            results: list[dict] = []
+            for page in sorted_pages:
+                title = page.get("title", "")
+                imageinfo = page.get("imageinfo", [])
+                if not imageinfo:
+                    continue
+                info = imageinfo[0]
+                mime = info.get("mime", "")
+                thumb_url = info.get("thumburl", "")
+                if not thumb_url or not mime.startswith("image/") or "svg" in mime:
+                    continue
+                # Strip "File:" prefix, extension, underscores for display
+                display = title.replace("File:", "").rsplit(".", 1)[0].replace("_", " ")
+                results.append({
+                    "thumb_url": thumb_url,
+                    "title": display,
+                    "page_url": f"https://commons.wikimedia.org/wiki/{urllib.parse.quote(title, safe=':/')}",
+                })
+                if len(results) >= limit:
+                    break
+
+            return results
+
+        except Exception as e:
+            print(f"Wikimedia image search failed for {query!r}: {e}")
+            return []
 
     # ── Wikipedia helpers ──────────────────────────────────────────────────────
 

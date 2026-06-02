@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { SceneData, ParticleCluster } from '@/types';
+import { SceneData, ParticleCluster, ReferenceImage } from '@/types';
 import { exportVisualizationAsHTML } from '@/utils/exportHTML';
 
 function createGlowTexture(): THREE.Texture {
@@ -349,6 +349,29 @@ export default function ThreeDViewer({ sceneData }: Props) {
       {visualNotes && (
         <div className="px-4 py-2 border-t border-[#1a1a2e] bg-[#080818]">
           <p className="text-xs text-[#64748b] italic">{visualNotes}</p>
+        </div>
+      )}
+      {(sceneData.reference_images?.length ?? 0) > 0 && (
+        <div className="px-4 py-3 border-t border-[#1a1a2e] bg-[#080818]">
+          <p className="text-[10px] text-[#334155] uppercase tracking-wider mb-2">Source Images</p>
+          <div className="flex gap-2 flex-wrap">
+            {sceneData.reference_images!.map((img: ReferenceImage, i: number) => (
+              <a
+                key={i}
+                href={img.page_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={img.title}
+                className="block shrink-0 group"
+              >
+                <img
+                  src={img.thumb_url}
+                  alt={img.title}
+                  className="w-16 h-16 object-cover rounded-lg border border-[#1e2a3a] opacity-50 group-hover:opacity-100 transition-opacity duration-200"
+                />
+              </a>
+            ))}
+          </div>
         </div>
       )}
     </div>
