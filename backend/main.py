@@ -27,6 +27,8 @@ from planner import VisualizationPlanner, VisualizationPlan
 from renderer import SVGRenderer
 from web_researcher import WebResearcher
 from database import get_db, init_db
+from concept_studio import ConceptStudio
+from models import UserConcept
 import concept_service as svc
 
 app = FastAPI(title="Lattice API", version="0.2.0")
@@ -39,10 +41,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-analyzer      = ConceptAnalyzer()
-planner       = VisualizationPlanner()
-renderer      = SVGRenderer()
-web_researcher = WebResearcher()
+analyzer        = ConceptAnalyzer()
+planner         = VisualizationPlanner()
+renderer        = SVGRenderer()
+web_researcher  = WebResearcher()
+concept_studio  = ConceptStudio()
 
 
 # ── Request / Response models ─────────────────────────────────────────────────
@@ -68,6 +71,10 @@ class ExplainRequest(BaseModel):
     """
     text: str
     user_id: Optional[str] = None   # defaults to DEFAULT_USER_ID
+
+class ExtractRequest(BaseModel):
+    """Lightweight: identify the primary concept without generating a full card."""
+    text: str
 
 class SaveConceptRequest(BaseModel):
     concept_name: str
@@ -129,76 +136,88 @@ async def generate(request: GenerateRequest) -> dict:
 
 # ── Knowledge system endpoints ────────────────────────────────────────────────
 
+@app.post("/concept/extract")
+async def extract_concept(request: ExtractRequest) -> dict:
+    """
+    Lightweight: identify the primary + supporting concepts in free-form text.
+    No DB writes. Used for instant feedback in the UI before full card load.
+    """
+    try:
+        extraction = concept_studio.extract_concepts(request.text)
+        return {
+            "primary_concept":     extraction.primary_concept,
+            "supporting_concepts": extraction.supporting_concepts,
+            "domain":              extraction.domain,
+            "input_type":          extraction.input_type,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
+
+
 @app.post("/concept/explain")
 async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)) -> dict:
     """
     Concept Studio main endpoint.
 
-    1. Analyzes the input text to extract the primary concept + relationships.
-    2. Fetches user's existing knowledge to personalize the explanation.
-    3. Generates a structured learning card.
-    4. Persists the concept and records the encounter in the DB.
-    5. Returns the full card + visualization data.
+    1. Extract primary concept from free-form input.
+    2. Fetch user's knowledge for personalization.
+    3. Generate personalized learning card via LLM.
+    4. Run visualization pipeline (analyzer → planner → renderer).
+    5. Persist concept + encounter to DB.
+    6. Return card + visualization + user state.
     """
     user_id = request.user_id or DEFAULT_USER_ID
     try:
-        # Step 1 — analyze
-        analysis = analyzer.analyze(request.text)
+        # 1 — what concept is the user asking about?
+        extraction = concept_studio.extract_concepts(request.text)
+        primary    = extraction.primary_concept
 
-        # Step 2 — personalization context: what does this user already know?
+        # 2 — what does this user already know? (personalization context)
         known = svc.get_user_known_concepts(db, user_id)
 
-        # Step 3 — web research (image grounding for 3d concepts)
-        research_data = {}
+        # 3 — generate the personalized learning card
+        card = concept_studio.generate_learning_card(primary, known)
+
+        # 4 — visualization pipeline (analyzer drives the particle/SVG renderer)
+        analysis = analyzer.analyze(request.text)
+        research_data: dict = {}
         if "3d" in analysis.recommended_visualization or "spatial" in analysis.recommended_visualization:
-            query = web_researcher.get_search_query(request.text, analysis.entities)
+            query = web_researcher.get_search_query(primary, analysis.entities)
             research_data = web_researcher.search_concept(query)
-
-        # Step 4 — plan + render visualization
         plan = planner.plan(analysis, research_data=research_data)
-        svg  = renderer.render(plan, concept_text=request.text, analysis_data=analysis.model_dump())
+        svg  = renderer.render(plan, concept_text=primary, analysis_data=analysis.model_dump())
 
-        # Step 5 — build learning card data
-        primary_concept_name = (
-            analysis.entities[0] if analysis.entities else request.text.strip()[:100]
-        )
-        prerequisites = [
-            r.target for r in analysis.relationships if r.type == "prerequisite"
-        ] or analysis.mechanisms[:2]
-        related = [e for e in analysis.entities[1:4]]
-
-        card_data = {
-            "summary":        analysis.difficulty_reason,
-            "how_it_works":   " ".join(analysis.mechanisms[:3]),
-            "key_components": [{"name": e, "description": ""} for e in analysis.entities[:6]],
-            "prerequisites":  prerequisites,
-            "related":        related,
-            "use_cases":      [],
-            "domain":         analysis.domain,
-        }
-
-        # Step 6 — persist to DB
+        # 5 — persist
+        card_dict = card.to_dict()
         concept = svc.create_or_update_concept(
             db,
-            name=primary_concept_name,
-            summary=analysis.difficulty_reason,
-            learning_card_data=card_data,
-            domain_name=analysis.domain,
+            name=primary,
+            summary=card.summary,
+            learning_card_data=card_dict,
+            domain_name=card.domain,
         )
-        svc.upsert_relationships(db, concept, prerequisites, related)
-        uc = svc.record_encounter(db, user_id, concept, session_data={"card": card_data})
+        svc.upsert_relationships(db, concept, card.prerequisites, card.related)
+        uc = svc.record_encounter(
+            db, user_id, concept,
+            session_data={"card": card_dict, "known_at_time": known},
+        )
         db.commit()
 
         return {
-            "concept_name":      primary_concept_name,
-            "concept_slug":      concept.slug,
-            "analysis":          analysis,
-            "plan":              plan,
-            "svg":               svg,
-            "card":              card_data,
-            "familiarity_score": uc.familiarity_score,
-            "encounter_count":   uc.encounter_count,
-            "known_context":     known,
+            "concept_name":        primary,
+            "concept_slug":        concept.slug,
+            "supporting_concepts": extraction.supporting_concepts,
+            "card":                card_dict,
+            "visualization": {
+                "type":       plan.visualization_type,
+                "scene_data": plan.scene_data,
+                "svg":        svg,
+            },
+            "user_state": {
+                "familiarity_score": uc.familiarity_score,
+                "encounter_count":   uc.encounter_count,
+                "known_context":     known,
+            },
         }
     except Exception as e:
         db.rollback()
@@ -236,7 +255,7 @@ async def get_concept(slug: str, user_id: Optional[str] = None, db: Session = De
     if not concept:
         raise HTTPException(status_code=404, detail="Concept not found")
     uid = user_id or DEFAULT_USER_ID
-    uc = db.query(__import__('models').UserConcept).filter_by(user_id=uid, concept_id=concept.id).first()
+    uc = db.query(UserConcept).filter_by(user_id=uid, concept_id=concept.id).first()
     return {
         "id":                concept.id,
         "name":              concept.name,
