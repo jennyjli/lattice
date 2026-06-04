@@ -1,1 +1,19 @@
 .claude/settings.json
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+.next/
+
+# Env
+.env
+backend/.env
