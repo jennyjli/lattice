@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import { latticeClient } from '@/api/client';
 import { ConceptExtractionResponse, ConceptExplanationResponse } from '@/types';
 import LearningCard from './LearningCard';
@@ -12,6 +13,7 @@ const EXAMPLES = [
 ];
 
 export default function ConceptStudio() {
+  const router                              = useRouter();
   const [inputText, setInputText]           = useState('');
   const [extraction, setExtraction]         = useState<ConceptExtractionResponse | null>(null);
   const [isExtracting, setIsExtracting]     = useState(false);
@@ -22,6 +24,14 @@ export default function ConceptStudio() {
   const [error, setError]                   = useState<string | null>(null);
   const debounceRef                         = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardRef                             = useRef<HTMLDivElement | null>(null);
+
+  // Pre-fill from ?q= param (e.g. clicking "Open in Studio" from Atlas)
+  useEffect(() => {
+    const { q } = router.query;
+    if (q && typeof q === 'string' && !inputText) {
+      setInputText(q);
+    }
+  }, [router.query]);
 
   // Debounced concept extraction as user types
   useEffect(() => {
