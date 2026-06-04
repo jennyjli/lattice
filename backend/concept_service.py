@@ -237,6 +237,96 @@ def get_user_known_concepts(db: Session, user_id: str) -> list[dict]:
     ]
 
 
+def get_contextual_knowledge(db: Session, user_id: str, concept_name: str) -> dict:
+    """
+    Build a prioritized personalization context for generating a learning card.
+
+    Strategy (no embeddings):
+      1. Graph neighbors — concepts connected to this one via stored relationship
+         edges score a +30 relevance bonus so they surface near the top.
+      2. Domain peers  — concepts in the same domain score +10.
+      3. All others ordered by raw familiarity score.
+
+    Returns:
+      {
+        prioritized:     list[{name, familiarity_score}]  # top 12, for LLM prompt
+        all_known:       list[{name, familiarity_score}]  # unfiltered
+        graph_related:   list[str]                        # names of graph neighbors
+        encounter_count: int                              # times user saw THIS concept
+      }
+    """
+    all_known = get_user_known_concepts(db, user_id)
+    known_names = {k["name"].lower() for k in all_known}
+
+    # Encounter count for THIS concept
+    concept = get_concept_by_name(db, concept_name)
+    encounter_count = 0
+    domain_name: Optional[str] = None
+    graph_neighbors: set[str] = set()
+
+    if concept:
+        uc = db.query(UserConcept).filter_by(user_id=user_id, concept_id=concept.id).first()
+        if uc:
+            encounter_count = uc.encounter_count
+
+        domain_name = concept.domain.name if concept.domain else None
+
+        # Direct graph neighbors (outgoing + incoming edges)
+        for rel in concept.outgoing_relationships:
+            if rel.target and rel.target.name.lower() in known_names:
+                graph_neighbors.add(rel.target.name)
+        for rel in concept.incoming_relationships:
+            if rel.source and rel.source.name.lower() in known_names:
+                graph_neighbors.add(rel.source.name)
+
+    # Domain peers the user knows
+    domain_known: set[str] = set()
+    if domain_name:
+        domain_obj = db.query(Domain).filter_by(name=domain_name).first()
+        if domain_obj:
+            domain_concept_names = {c.name for c in domain_obj.concepts}
+            domain_known = {k["name"] for k in all_known if k["name"] in domain_concept_names}
+
+    def _relevance(k: dict) -> int:
+        bonus = 0
+        if k["name"] in graph_neighbors:
+            bonus += 30
+        elif k["name"] in domain_known:
+            bonus += 10
+        return k["familiarity_score"] + bonus
+
+    prioritized = sorted(all_known, key=_relevance, reverse=True)[:12]
+
+    return {
+        "prioritized":     prioritized,
+        "all_known":       all_known,
+        "graph_related":   sorted(graph_neighbors),
+        "encounter_count": encounter_count,
+    }
+
+
+def get_knowledge_gaps(db: Session, user_id: str, prerequisites: list[str]) -> list[dict]:
+    """
+    Given prerequisite concept names from a learning card, return those the user
+    hasn't yet learned well (familiarity < 40).
+
+    Returns list of {name, familiarity_score, slug} sorted by familiarity ascending
+    (biggest gap first).
+    """
+    known_map = {k["name"].lower(): k["familiarity_score"] for k in get_user_known_concepts(db, user_id)}
+    gaps = []
+    for prereq in prerequisites:
+        score = known_map.get(prereq.lower(), 0)
+        if score < 40:
+            concept = get_concept_by_name(db, prereq)
+            gaps.append({
+                "name":              prereq,
+                "familiarity_score": score,
+                "slug":              concept.slug if concept else None,
+            })
+    return sorted(gaps, key=lambda g: g["familiarity_score"])
+
+
 # ── Serialization ─────────────────────────────────────────────────────────────
 
 def _serialize_user_concept(uc: UserConcept) -> dict:

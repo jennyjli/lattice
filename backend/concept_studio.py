@@ -128,18 +128,23 @@ Return ONLY valid JSON:
         self,
         concept_name: str,
         known_concepts: list[dict],
+        encounter_count: int = 0,
     ) -> LearningCard:
         """
         Generate a personalized learning card for concept_name.
 
-        known_concepts: list of {name, familiarity_score} from user history.
-          Familiarity 0-100. High familiarity → use as building blocks freely.
-          Low familiarity → mention only briefly.
+        known_concepts: list of {name, familiarity_score} — already prioritized
+          by relevance (graph neighbors first, then domain peers, then familiarity).
+        encounter_count: how many times this user has seen this concept before.
+          0 → foundational intro, 1-2 → deepen, 3+ → expert-level.
         """
         personalization_block = self._build_personalization_block(known_concepts)
+        depth_instruction     = self._depth_instruction(encounter_count)
 
         prompt = f"""You are Lattice, a personalized learning companion.
 Your job is to explain "{concept_name}" in a way that is clear, precise, and tailored to this learner.
+
+{depth_instruction}
 
 {personalization_block}
 
@@ -220,6 +225,28 @@ Rules:
             "explicitly connect it (e.g. 'Like {known}, but...' or 'Building on {known}...')."
         )
         return "\n".join(lines)
+
+    def _depth_instruction(self, encounter_count: int) -> str:
+        """Return a prompt instruction that scales explanation depth with encounter history."""
+        if encounter_count == 0:
+            return (
+                "DEPTH: This is the learner's FIRST encounter with this concept. "
+                "Start from first principles. Build intuition before detail. "
+                "Prioritize clarity and a memorable mental model."
+            )
+        elif encounter_count <= 2:
+            return (
+                f"DEPTH: The learner has seen this concept {encounter_count} time(s). "
+                "Build on their baseline — add nuance, address common misconceptions, "
+                "and provide richer context and examples."
+            )
+        else:
+            return (
+                f"DEPTH: The learner has revisited this concept {encounter_count} times. "
+                "Go expert-level: advanced mechanics, subtle tradeoffs, "
+                "failure modes, and how this concept connects to broader systems. "
+                "Skip introductory explanation entirely."
+            )
 
     # ── LLM plumbing ───────────────────────────────────────────────────────────
 

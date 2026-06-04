@@ -121,6 +121,12 @@ export interface ConceptExtractionResponse {
   input_type: 'concept' | 'question' | 'paragraph';
 }
 
+export interface KnowledgeGap {
+  name: string;
+  familiarity_score: number;
+  slug: string | null;
+}
+
 export interface ConceptExplanationResponse {
   concept_name: string;
   concept_slug: string;
@@ -131,10 +137,13 @@ export interface ConceptExplanationResponse {
     scene_data?: SceneData;
     svg?: string;
   };
+  knowledge_gaps: KnowledgeGap[];
   user_state: {
     familiarity_score: number;
     encounter_count: number;
+    depth_mode: 'first_look' | 'building' | 'deepening';
     known_context: Array<{ name: string; familiarity_score: number }>;
+    graph_related: string[];
   };
 }
 

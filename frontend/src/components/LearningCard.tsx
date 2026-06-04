@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ConceptExplanationResponse } from '@/types';
+import Link from 'next/link';
+import { ConceptExplanationResponse, KnowledgeGap } from '@/types';
 import ThreeDViewer from './ThreeDViewer';
 
 interface Props {
@@ -8,6 +9,12 @@ interface Props {
   isSaved: boolean;
   isSaving: boolean;
 }
+
+const DEPTH_CONFIG = {
+  first_look: { label: 'First look',           color: 'bg-gray-100 text-gray-500' },
+  building:   { label: 'Building understanding', color: 'bg-blue-50 text-blue-500' },
+  deepening:  { label: 'Going deeper',          color: 'bg-purple-50 text-purple-600' },
+} as const;
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -64,12 +71,14 @@ function ConceptPill({
 // ── Main card ─────────────────────────────────────────────────────────────────
 
 export default function LearningCard({ data, onSave, isSaved, isSaving }: Props) {
-  const { card, visualization, user_state, concept_name, supporting_concepts } = data;
+  const { card, visualization, user_state, concept_name, supporting_concepts, knowledge_gaps } = data;
   const [showRawJson, setShowRawJson] = useState(false);
 
   const has3D =
     visualization.type === '3d' &&
     visualization.scene_data?.render_mode === 'particles';
+
+  const depth = DEPTH_CONFIG[user_state.depth_mode] ?? DEPTH_CONFIG.first_look;
 
   return (
     <article className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -78,11 +87,14 @@ export default function LearningCard({ data, onSave, isSaved, isSaving }: Props)
       <div className="px-6 pt-6 pb-5 border-b border-gray-100">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-xs font-medium px-2 py-0.5 bg-brand-100 text-brand-700 rounded-full">
                 {card.domain}
               </span>
-              {supporting_concepts.slice(0, 3).map((c) => (
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${depth.color}`}>
+                {depth.label}
+              </span>
+              {supporting_concepts.slice(0, 2).map((c) => (
                 <span key={c} className="text-xs text-gray-400">
                   {c}
                 </span>
@@ -238,23 +250,60 @@ export default function LearningCard({ data, onSave, isSaved, isSaving }: Props)
           </>
         )}
 
-        {/* ── Personalization context (collapsible) ── */}
+        {/* ── Knowledge Gaps ── */}
+        {knowledge_gaps && knowledge_gaps.length > 0 && (
+          <>
+            <Divider />
+            <section>
+              <SectionLabel>Learn These First</SectionLabel>
+              <p className="text-xs text-gray-400 mb-2">
+                Prerequisites you haven't explored yet — understanding them will make this concept click faster.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {knowledge_gaps.map((gap: KnowledgeGap) => (
+                  <Link
+                    key={gap.name}
+                    href={`/?q=${encodeURIComponent(gap.name)}`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition-colors"
+                  >
+                    <span className="opacity-50">←</span>
+                    {gap.name}
+                    {gap.familiarity_score > 0 && (
+                      <span className="opacity-50 font-normal">{gap.familiarity_score}%</span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+
+        {/* ── Personalization context ── */}
         {user_state.known_context.length > 0 && (
           <>
             <Divider />
             <section>
-              <SectionLabel>Personalized based on</SectionLabel>
+              <SectionLabel>Personalized using</SectionLabel>
               <div className="flex flex-wrap gap-1.5">
-                {user_state.known_context.slice(0, 8).map((k) => (
+                {user_state.known_context.slice(0, 10).map((k) => (
                   <span
                     key={k.name}
-                    className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600"
-                    title={`Familiarity: ${k.familiarity_score}`}
+                    className={`text-xs px-2 py-0.5 rounded border ${
+                      user_state.graph_related?.includes(k.name)
+                        ? 'bg-brand-50 text-brand-600 border-brand-100'
+                        : 'bg-gray-50 text-gray-400 border-gray-100'
+                    }`}
+                    title={`Familiarity: ${k.familiarity_score}${user_state.graph_related?.includes(k.name) ? ' · Graph neighbor' : ''}`}
                   >
                     {k.name}
                   </span>
                 ))}
               </div>
+              {user_state.graph_related?.length > 0 && (
+                <p className="text-[10px] text-gray-300 mt-1.5">
+                  Highlighted concepts are directly connected in your knowledge graph.
+                </p>
+              )}
             </section>
           </>
         )}

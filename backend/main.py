@@ -168,17 +168,21 @@ async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)
     """
     user_id = request.user_id or DEFAULT_USER_ID
     try:
-        # 1 — what concept is the user asking about?
+        # 1 — extract primary concept
         extraction = concept_studio.extract_concepts(request.text)
         primary    = extraction.primary_concept
 
-        # 2 — what does this user already know? (personalization context)
-        known = svc.get_user_known_concepts(db, user_id)
+        # 2 — graph-aware personalization context (prioritizes graph neighbors + domain peers)
+        ctx = svc.get_contextual_knowledge(db, user_id, primary)
 
-        # 3 — generate the personalized learning card
-        card = concept_studio.generate_learning_card(primary, known)
+        # 3 — generate personalized card with depth scaled to encounter history
+        card = concept_studio.generate_learning_card(
+            primary,
+            ctx["prioritized"],
+            encounter_count=ctx["encounter_count"],
+        )
 
-        # 4 — visualization pipeline (analyzer drives the particle/SVG renderer)
+        # 4 — visualization pipeline
         analysis = analyzer.analyze(request.text)
         research_data: dict = {}
         if "3d" in analysis.recommended_visualization or "spatial" in analysis.recommended_visualization:
@@ -187,7 +191,7 @@ async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)
         plan = planner.plan(analysis, research_data=research_data)
         svg  = renderer.render(plan, concept_text=primary, analysis_data=analysis.model_dump())
 
-        # 5 — persist
+        # 5 — persist concept + encounter
         card_dict = card.to_dict()
         concept = svc.create_or_update_concept(
             db,
@@ -199,9 +203,20 @@ async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)
         svc.upsert_relationships(db, concept, card.prerequisites, card.related)
         uc = svc.record_encounter(
             db, user_id, concept,
-            session_data={"card": card_dict, "known_at_time": known},
+            session_data={
+                "card":          card_dict,
+                "known_at_time": ctx["all_known"],
+                "encounter_num": ctx["encounter_count"],
+            },
         )
         db.commit()
+
+        # 6 — knowledge gaps: prerequisites the user hasn't learned well yet
+        gaps = svc.get_knowledge_gaps(db, user_id, card.prerequisites)
+
+        # Depth mode label for the frontend
+        ec = uc.encounter_count
+        depth_mode = "first_look" if ec <= 1 else "building" if ec <= 3 else "deepening"
 
         return {
             "concept_name":        primary,
@@ -213,10 +228,13 @@ async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)
                 "scene_data": plan.scene_data,
                 "svg":        svg,
             },
+            "knowledge_gaps": gaps,
             "user_state": {
                 "familiarity_score": uc.familiarity_score,
                 "encounter_count":   uc.encounter_count,
-                "known_context":     known,
+                "depth_mode":        depth_mode,
+                "known_context":     ctx["all_known"],
+                "graph_related":     ctx["graph_related"],
             },
         }
     except Exception as e:
