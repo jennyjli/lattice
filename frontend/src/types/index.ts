@@ -95,6 +95,71 @@ export interface Annotation {
   description?: string;
 }
 
+// ── Phase 2: Knowledge system types ──────────────────────────────────────────
+
+export interface KeyComponent {
+  name: string;
+  description: string;
+}
+
+export interface LearningCardData {
+  title: string;
+  summary: string;
+  how_it_works: string;
+  key_components: KeyComponent[];
+  prerequisites: string[];
+  related: string[];
+  use_cases: string[];
+  domain: string;
+  analogy?: string | null;
+}
+
+export interface ConceptExtractionResponse {
+  primary_concept: string;
+  supporting_concepts: string[];
+  domain: string;
+  input_type: 'concept' | 'question' | 'paragraph';
+}
+
+export interface ConceptExplanationResponse {
+  concept_name: string;
+  concept_slug: string;
+  supporting_concepts: string[];
+  card: LearningCardData;
+  visualization: {
+    type: string;
+    scene_data?: SceneData;
+    svg?: string;
+  };
+  user_state: {
+    familiarity_score: number;
+    encounter_count: number;
+    known_context: Array<{ name: string; familiarity_score: number }>;
+  };
+}
+
+export interface UserConceptSummary {
+  id: string;
+  name: string;
+  slug: string;
+  summary: string;
+  domain: string | null;
+  familiarity_score: number;
+  encounter_count: number;
+  first_seen: string;
+  last_seen: string;
+  saved: boolean;
+  learning_card_data: LearningCardData | null;
+}
+
+export interface AtlasResponse {
+  recently_learned: UserConceptSummary[];
+  growing_domains: Array<{ name: string; concept_count: number }>;
+  saved_concepts: UserConceptSummary[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface ExplanationBlock {
   id: string;
   original_text: string;

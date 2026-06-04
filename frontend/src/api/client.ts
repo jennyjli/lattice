@@ -1,5 +1,11 @@
 import axios, { AxiosInstance } from 'axios';
-import { ConceptAnalysis, VisualizationPlan } from '@/types';
+import {
+  ConceptAnalysis,
+  VisualizationPlan,
+  ConceptExtractionResponse,
+  ConceptExplanationResponse,
+  AtlasResponse,
+} from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -9,45 +15,27 @@ class LatticeClient {
   constructor() {
     this.client = axios.create({
       baseURL: API_URL,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  /**
-   * Analyze note content to detect explanation opportunities
-   */
+  // ── Legacy visualization pipeline ──────────────────────────────────────────
+
   async analyzeContent(text: string): Promise<ConceptAnalysis> {
-    const response = await this.client.post<ConceptAnalysis>('/analyze', {
-      text,
-    });
-    return response.data;
+    const r = await this.client.post<ConceptAnalysis>('/analyze', { text });
+    return r.data;
   }
 
-  /**
-   * Generate a visualization plan from concept analysis
-   */
   async planVisualization(analysis: ConceptAnalysis): Promise<VisualizationPlan> {
-    const response = await this.client.post<VisualizationPlan>('/plan', {
-      analysis,
-    });
-    return response.data;
+    const r = await this.client.post<VisualizationPlan>('/plan', { analysis });
+    return r.data;
   }
 
-  /**
-   * Generate SVG visualization from a plan
-   */
   async renderVisualization(plan: VisualizationPlan): Promise<{ svg: string }> {
-    const response = await this.client.post<{ svg: string }>('/render', {
-      plan,
-    });
-    return response.data;
+    const r = await this.client.post<{ svg: string }>('/render', { plan });
+    return r.data;
   }
 
-  /**
-   * Full pipeline: analyze → plan → render
-   */
   async generateExplanation(text: string) {
     const analysis = await this.analyzeContent(text);
     const plan = await this.planVisualization(analysis);
@@ -55,12 +43,52 @@ class LatticeClient {
     return { analysis, plan, svg };
   }
 
+  // ── Knowledge system ───────────────────────────────────────────────────────
+
+  /** Identify the primary concept without generating a full card (fast). */
+  async extractConcept(text: string): Promise<ConceptExtractionResponse> {
+    const r = await this.client.post<ConceptExtractionResponse>('/concept/extract', { text });
+    return r.data;
+  }
+
   /**
-   * Health check
+   * Full Concept Studio pipeline: extract → personalized card + visualization.
+   * Persists encounter to DB automatically.
    */
+  async explainConcept(
+    text: string,
+    userId?: string,
+  ): Promise<ConceptExplanationResponse> {
+    const r = await this.client.post<ConceptExplanationResponse>('/concept/explain', {
+      text,
+      user_id: userId,
+    });
+    return r.data;
+  }
+
+  /** Save a concept to the user's Knowledge Atlas (+10 familiarity). */
+  async saveConcept(
+    conceptName: string,
+    userId?: string,
+  ): Promise<{ saved: boolean; familiarity_score: number }> {
+    const r = await this.client.post('/concept/save', {
+      concept_name: conceptName,
+      user_id: userId,
+    });
+    return r.data;
+  }
+
+  /** Fetch the user's full Knowledge Atlas. */
+  async getAtlas(userId?: string): Promise<AtlasResponse> {
+    const r = await this.client.get<AtlasResponse>('/atlas', {
+      params: userId ? { user_id: userId } : undefined,
+    });
+    return r.data;
+  }
+
   async health(): Promise<{ status: string }> {
-    const response = await this.client.get<{ status: string }>('/health');
-    return response.data;
+    const r = await this.client.get<{ status: string }>('/health');
+    return r.data;
   }
 }
 
