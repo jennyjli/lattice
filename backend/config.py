@@ -34,3 +34,9 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 ENABLE_IMAGE_GENERATION = os.getenv('ENABLE_IMAGE_GENERATION', 'True').lower() == 'true'
 IMAGE_GEN_PROVIDER = os.getenv('IMAGE_GEN_PROVIDER', 'gemini')  # 'gemini' or 'openai'
 IMAGE_SIZE = os.getenv('IMAGE_SIZE', '512x512')
+
+# Database — SQLite for local dev, PostgreSQL in prod
+DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./lattice.db')
+
+# Default user for MVP (no auth yet)
+DEFAULT_USER_ID = os.getenv('DEFAULT_USER_ID', 'default')
