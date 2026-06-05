@@ -63,32 +63,34 @@ class VisualizationPlanner:
         )
 
     def _choose_visualization_type(self, analysis: ConceptAnalysis) -> str:
-        """Choose primary visualization type"""
-        # Prioritize based on recommendations
-        viz_recommendations = analysis.recommended_visualization
-        
-        if "animation" in viz_recommendations:
-            # Animation for dynamic processes, temporal sequences
-            if any(word in analysis.concept_type.lower() for word in ["process", "temporal", "dynamic"]):
-                return "animation"
-        
-        if "comparison" in viz_recommendations:
-            # Comparison for before/after, normal vs affected states
+        """Choose primary visualization type."""
+        recs = set(analysis.recommended_visualization)
+        has_mechanisms = bool(analysis.mechanisms)
+
+        # 3D/spatial always wins — handled by its own renderer
+        if "3d" in recs or "spatial" in recs:
+            return "3d"
+
+        # Comparison for before/after states
+        if "comparison" in recs:
             return "comparison"
-        
-        if "timeline" in viz_recommendations:
-            # Timeline for sequential processes
-            if "temporal" in analysis.concept_type.lower() or "process" in analysis.concept_type.lower():
-                return "timeline"
-        
-        if "interactive" in viz_recommendations:
-            # Interactive for simulations
+
+        # Animation wins over interactive whenever the concept has sequential
+        # mechanisms. "Interactive" is only appropriate for truly parametric
+        # simulations (e.g. gas laws, pendulum) — not for biological processes.
+        if "animation" in recs:
+            return "animation"
+
+        if "interactive" in recs and has_mechanisms:
+            # Biological/chemical mechanisms have clear steps; animate them.
+            return "animation"
+
+        if "timeline" in recs:
+            return "timeline"
+
+        if "interactive" in recs:
             return "interactive"
 
-        if "3d" in viz_recommendations or "spatial" in viz_recommendations:
-            return "3d"
-        
-        # Default to diagram
         return "diagram"
 
     def _plan_scenes(self, analysis: ConceptAnalysis, viz_type: str) -> list[str]:

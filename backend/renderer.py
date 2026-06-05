@@ -7,6 +7,7 @@ Integrates with AI image generation when available.
 
 from planner import VisualizationPlan
 import json
+import math
 from typing import List
 
 
@@ -149,52 +150,428 @@ class SVGRenderer:
         return svg
 
     def _render_animation(self, plan: VisualizationPlan) -> str:
-        """Render animated SVG with frame sequences"""
-        # Create multi-frame animation
-        svg = f"""<svg width="{self.svg_width}" height="{self.svg_height}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <style>
-      .scene {{ opacity: 0; animation: scene-show 3s infinite; }}
-      .scene:nth-child(1) {{ animation-delay: 0s; }}
-      .scene:nth-child(2) {{ animation-delay: 1s; }}
-      .scene:nth-child(3) {{ animation-delay: 2s; }}
-      @keyframes scene-show {{
-        0%, 100% {{ opacity: 0; }}
-        10% {{ opacity: 1; }}
-        90% {{ opacity: 1; }}
-      }}
-    </style>
-  </defs>
-  
-  <!-- Background -->
-  <rect width="{self.svg_width}" height="{self.svg_height}" fill="{self.colors['bg']}" />
-  
-  <!-- Title -->
-  <text x="300" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="{self.colors['text']}">
-    {plan.visualization_type.title()} - {len(plan.scenes)} Stages
-  </text>"""
-        
-        # Render each scene
-        for idx, scene in enumerate(plan.scenes[:4]):  # Limit to 4 frames
-            y_offset = 100 + (idx * 60)
-            svg += f"""
-  <!-- Scene {idx + 1}: {scene} -->
-  <g class="scene">
-    <circle cx="100" cy="{y_offset}" r="30" fill="{self.colors['primary']}" opacity="0.7"/>
-    <text x="100" y="{y_offset + 5}" text-anchor="middle" font-size="24" fill="white" font-weight="bold">{idx + 1}</text>
-    <text x="160" y="{y_offset + 8}" font-size="13" fill="{self.colors['text']}">{scene}</text>
-  </g>"""
-        
-        svg += f"""
-  
-  <!-- Controls info -->
-  <rect x="50" y="360" width="500" height="30" fill="{self.colors['accent']}" opacity="0.1" stroke="{self.colors['accent']}" stroke-width="1" rx="2"/>
-  <text x="60" y="380" font-size="12" fill="{self.colors['text_light']}">
-    Animation plays automatically. {len(plan.scenes)} scenes, cycling every 3 seconds.
-  </text>
-</svg>"""
-        
-        return svg
+        """
+        Sequential step-by-step process animation.
+
+        Each scene occupies an exclusive time window — no overlap.
+        Scene graphics are selected from domain-aware helpers based on
+        keywords in the scene description (gRNA, cut, repair, etc.).
+        """
+        scenes = [s for s in plan.scenes if s.strip()][:6]
+        n = len(scenes) or 1
+        sps = 5                   # seconds per scene
+        total = n * sps
+
+        # Build one non-overlapping keyframe per scene
+        style_parts = []
+        for i in range(n):
+            sp = (i * sps / total) * 100
+            ep = ((i + 1) * sps / total) * 100
+            fi = sp + min(1.2, (ep - sp) * 0.18)
+            fo = ep - min(1.2, (ep - sp) * 0.18)
+            style_parts.append(
+                f".sc{i}{{opacity:0;animation:a{i} {total}s infinite}}"
+                f"@keyframes a{i}{{"
+                f"0%,{sp:.1f}%{{opacity:0}}"
+                f"{fi:.1f}%{{opacity:1}}"
+                f"{fo:.1f}%{{opacity:1}}"
+                f"{ep:.1f}%,100%{{opacity:0}}}}"
+            )
+
+        style = "".join(style_parts)
+        W, H = self.svg_width, self.svg_height
+
+        scene_groups = ""
+        for i, scene_text in enumerate(scenes):
+            body = self._anim_scene(i, scene_text, n, W, H)
+            scene_groups += f'<g class="sc{i}">{body}</g>\n'
+
+        return (
+            f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg">'
+            f'<defs><style>{style}</style></defs>'
+            f'<rect width="{W}" height="{H}" fill="#f8fafc" rx="6"/>'
+            f'{scene_groups}'
+            f'</svg>'
+        )
+
+    # ── Animation scene dispatcher ─────────────────────────────────────────────
+
+    def _anim_scene(self, idx: int, scene_text: str, total: int,
+                    W: int, H: int) -> str:
+        tl = scene_text.lower()
+        cx, cy = W // 2, H // 2 + 10
+
+        # Step pill + scene title
+        title = scene_text if len(scene_text) <= 58 else scene_text[:55] + "…"
+        header = (
+            f'<rect x="18" y="16" width="70" height="22" rx="11" fill="{self.colors["primary"]}" opacity="0.13"/>'
+            f'<text x="53" y="31" text-anchor="middle" font-size="10" font-weight="700" '
+            f'letter-spacing="0.04em" fill="{self.colors["primary"]}">STEP {idx+1} / {total}</text>'
+            f'<text x="{W//2}" y="64" text-anchor="middle" font-size="14" font-weight="700" '
+            f'fill="{self.colors["text"]}">{title}</text>'
+        )
+
+        # Keyword-driven graphic selection
+        if idx == 0 or any(w in tl for w in ("initial", "baseline", "normal", "dna", "genome")):
+            graphic = self._ag_dna_overview(cx, cy)
+        elif any(w in tl for w in ("guide", "grna", "cas9", "complex", "load")):
+            graphic = self._ag_cas9_grna(cx, cy)
+        elif any(w in tl for w in ("scan", "pam", "recogni", "search", "find")):
+            graphic = self._ag_pam_recognition(cx, cy)
+        elif any(w in tl for w in ("unwind", "hybrid", "r-loop", "r loop", "open")):
+            graphic = self._ag_dna_unwinding(cx, cy)
+        elif any(w in tl for w in ("cut", "break", "cleav", "nick", "scissor")):
+            graphic = self._ag_dna_break(cx, cy)
+        elif any(w in tl for w in ("repair", "nhej", "hdr", "result", "outcome", "edit", "fix")):
+            graphic = self._ag_repair(cx, cy)
+        else:
+            graphic = self._ag_generic(idx, scene_text, cx, cy)
+
+        # Progress bar
+        bar_w = int((W - 100) * (idx + 1) / total)
+        footer = (
+            f'<rect x="50" y="{H-14}" width="{W-100}" height="3" rx="1.5" '
+            f'fill="{self.colors["secondary"]}" opacity="0.12"/>'
+            f'<rect x="50" y="{H-14}" width="{bar_w}" height="3" rx="1.5" '
+            f'fill="{self.colors["primary"]}" opacity="0.55"/>'
+        )
+        return header + graphic + footer
+
+    # ── DNA helper ─────────────────────────────────────────────────────────────
+
+    def _sine_path(self, x0: float, y_center: float, amp: float,
+                   period: float, width: float, phase: float = 0.0) -> str:
+        """Polyline approximation of a sine wave."""
+        pts = []
+        steps = int(width)
+        for dx in range(0, steps + 1, 3):
+            x = x0 + dx
+            y = y_center + amp * math.sin(2 * math.pi * (dx / period + phase))
+            pts.append(f"{x:.1f},{y:.1f}")
+        return f"M {pts[0]} L {' '.join(pts[1:])}"
+
+    def _dna_ladder(self, x0: int, x1: int, y1: int, y2: int,
+                    amp: int, period: int,
+                    highlight_x0: int = 0, highlight_x1: int = 0) -> str:
+        """DNA double-helix ladder: two sinusoidal strands + base-pair rungs."""
+        parts = []
+        # Top strand
+        parts.append(
+            f'<path d="{self._sine_path(x0, y1, amp, period, x1-x0)}" '
+            f'stroke="#3b82f6" stroke-width="2.8" fill="none" stroke-linecap="round"/>'
+        )
+        # Bottom strand (anti-parallel: phase = 0.5)
+        parts.append(
+            f'<path d="{self._sine_path(x0, y2, amp, period, x1-x0, 0.5)}" '
+            f'stroke="#06b6d4" stroke-width="2.8" fill="none" stroke-linecap="round"/>'
+        )
+        # Base-pair rungs every half-period
+        rung_step = max(10, period // 4)
+        for dx in range(0, x1 - x0, rung_step):
+            x = x0 + dx
+            yt = y1 + amp * math.sin(2 * math.pi * dx / period)
+            yb = y2 + amp * math.sin(2 * math.pi * dx / period + math.pi)
+            in_target = highlight_x0 < x < highlight_x1
+            color = "#f97316" if in_target else "#bfdbfe"
+            opacity = "0.9" if in_target else "0.65"
+            parts.append(
+                f'<line x1="{x}" y1="{yt:.1f}" x2="{x}" y2="{yb:.1f}" '
+                f'stroke="{color}" stroke-width="1.8" opacity="{opacity}"/>'
+            )
+        return "\n".join(parts)
+
+    # ── Scene graphics ─────────────────────────────────────────────────────────
+
+    def _ag_dna_overview(self, cx: int, cy: int) -> str:
+        """Scene 0 — Target DNA with PAM site highlighted."""
+        x0, x1 = cx - 230, cx + 230
+        y1, y2 = cy - 38, cy + 38
+        tx0, tx1 = cx - 72, cx + 72
+
+        parts = [
+            # Target highlight box
+            f'<rect x="{tx0}" y="{y1-12}" width="{tx1-tx0}" height="{y2-y1+24}" '
+            f'rx="5" fill="#f97316" opacity="0.07"/>',
+
+            self._dna_ladder(x0, x1, y1, y2, amp=15, period=58,
+                             highlight_x0=tx0, highlight_x1=tx1),
+
+            # Strand labels
+            f'<text x="{x0-5}" y="{y1+4}" text-anchor="end" font-size="10" '
+            f'fill="#3b82f6" font-family="monospace">5\'</text>',
+            f'<text x="{x1+5}" y="{y1+4}" font-size="10" fill="#3b82f6" '
+            f'font-family="monospace">3\'</text>',
+            f'<text x="{x0-5}" y="{y2+4}" text-anchor="end" font-size="10" '
+            f'fill="#06b6d4" font-family="monospace">3\'</text>',
+            f'<text x="{x1+5}" y="{y2+4}" font-size="10" fill="#06b6d4" '
+            f'font-family="monospace">5\'</text>',
+
+            # Target label
+            f'<text x="{cx}" y="{cy+62}" text-anchor="middle" font-size="11" '
+            f'font-weight="700" fill="#f97316">▲ Target Sequence</text>',
+
+            # PAM site callout
+            f'<rect x="{tx1+6}" y="{y1-8}" width="80" height="36" rx="4" '
+            f'fill="#7c3aed" opacity="0.08"/>',
+            f'<text x="{tx1+46}" y="{y1+8}" text-anchor="middle" font-size="10" '
+            f'font-weight="700" fill="#7c3aed">5\'−NGG−3\'</text>',
+            f'<text x="{tx1+46}" y="{y1+22}" text-anchor="middle" font-size="9" '
+            f'fill="#9333ea">PAM site</text>',
+        ]
+        return "\n".join(parts)
+
+    def _ag_cas9_grna(self, cx: int, cy: int) -> str:
+        """Scene 1 — Cas9 + gRNA complex."""
+        # Faint DNA in background
+        x0, x1 = cx - 230, cx + 230
+        y1, y2 = cy - 28, cy + 28
+
+        parts = [
+            # Background DNA (lighter)
+            f'<path d="{self._sine_path(x0, y1, 11, 52, x1-x0)}" '
+            f'stroke="#bfdbfe" stroke-width="2" fill="none"/>',
+            f'<path d="{self._sine_path(x0, y2, 11, 52, x1-x0, 0.5)}" '
+            f'stroke="#a5f3fc" stroke-width="2" fill="none"/>',
+        ]
+        # Faint rungs
+        for dx in range(0, x1 - x0, 14):
+            x = x0 + dx
+            yt = y1 + 11 * math.sin(2 * math.pi * dx / 52)
+            yb = y2 + 11 * math.sin(2 * math.pi * dx / 52 + math.pi)
+            parts.append(
+                f'<line x1="{x}" y1="{yt:.1f}" x2="{x}" y2="{yb:.1f}" '
+                f'stroke="#dbeafe" stroke-width="1" opacity="0.5"/>'
+            )
+
+        # Cas9 protein blob (left of center)
+        bx, by = cx - 100, cy - 4
+        parts += [
+            f'<ellipse cx="{bx}" cy="{by}" rx="56" ry="40" fill="#2563eb" opacity="0.88"/>',
+            f'<ellipse cx="{bx+14}" cy="{by+10}" rx="28" ry="20" fill="#1d4ed8" opacity="0.45"/>',
+            f'<text x="{bx}" y="{by+5}" text-anchor="middle" font-size="12" '
+            f'font-weight="800" fill="white">Cas9</text>',
+        ]
+
+        # gRNA (red squiggly extending right from Cas9)
+        gx = bx + 54
+        gy = by - 12
+        parts += [
+            f'<path d="M {gx},{gy} C {gx+16},{gy-14} {gx+32},{gy+14} {gx+48},{gy} '
+            f'C {gx+64},{gy-14} {gx+80},{gy+14} {gx+96},{gy}" '
+            f'stroke="#ef4444" stroke-width="2.8" fill="none" stroke-linecap="round"/>',
+            f'<text x="{gx+48}" y="{gy-20}" text-anchor="middle" font-size="10" '
+            f'font-weight="700" fill="#ef4444">guide RNA</text>',
+        ]
+
+        # Scanning arrow + label
+        ax0, ax1 = cx + 30, cx + 175
+        arrow_y = cy + 62
+        parts += [
+            f'<line x1="{ax0}" y1="{arrow_y}" x2="{ax1-14}" y2="{arrow_y}" '
+            f'stroke="{self.colors["primary"]}" stroke-width="2"/>',
+            f'<polygon points="{ax1},{arrow_y} {ax1-14},{arrow_y-6} {ax1-14},{arrow_y+6}" '
+            f'fill="{self.colors["primary"]}"/>',
+            f'<text x="{(ax0+ax1)//2}" y="{arrow_y+16}" text-anchor="middle" '
+            f'font-size="10" fill="{self.colors["text_light"]}">scanning for PAM…</text>',
+        ]
+        return "\n".join(parts)
+
+    def _ag_pam_recognition(self, cx: int, cy: int) -> str:
+        """Scene 2 — Cas9 locked onto PAM site, DNA beginning to open."""
+        x0, x1 = cx - 230, cx + 230
+        y1, y2 = cy - 32, cy + 32
+
+        parts = [
+            self._dna_ladder(x0, x1, y1, y2, amp=13, period=54,
+                             highlight_x0=cx - 55, highlight_x1=cx + 55),
+        ]
+
+        # Cas9 sitting on the target site
+        bx, by = cx - 10, cy
+        parts += [
+            f'<ellipse cx="{bx}" cy="{by}" rx="60" ry="44" fill="#2563eb" opacity="0.82"/>',
+            f'<ellipse cx="{bx+16}" cy="{by+12}" rx="30" ry="20" fill="#1e40af" opacity="0.4"/>',
+            f'<text x="{bx}" y="{by+5}" text-anchor="middle" font-size="12" '
+            f'font-weight="800" fill="white">Cas9</text>',
+        ]
+
+        # PAM callout
+        parts += [
+            f'<rect x="{cx+52}" y="{y1-22}" width="88" height="30" rx="4" '
+            f'fill="#7c3aed" opacity="0.12"/>',
+            f'<text x="{cx+96}" y="{y1-8}" text-anchor="middle" font-size="10" '
+            f'font-weight="700" fill="#7c3aed">PAM: 5\'−NGG−3\'</text>',
+            f'<text x="{cx+96}" y="{y1+6}" text-anchor="middle" font-size="9" '
+            f'fill="#9333ea">recognized ✓</text>',
+            f'<line x1="{cx+52}" y1="{y1-7}" x2="{cx+14}" y2="{y1+6}" '
+            f'stroke="#9333ea" stroke-width="1" stroke-dasharray="3,2"/>',
+        ]
+
+        # "Locked on" badge
+        parts.append(
+            f'<text x="{cx}" y="{cy+68}" text-anchor="middle" font-size="11" '
+            f'font-weight="600" fill="#16a34a">✓ Target located — preparing to unwind DNA</text>'
+        )
+        return "\n".join(parts)
+
+    def _ag_dna_unwinding(self, cx: int, cy: int) -> str:
+        """Scene 3 — DNA unwinding at target site; gRNA hybridizes to one strand."""
+        x0, x1 = cx - 230, cx + 230
+        y1, y2 = cy - 35, cy + 35
+        uw0, uw1 = cx - 60, cx + 60   # unwound region
+
+        parts = []
+        # Left intact segment
+        parts.append(
+            self._dna_ladder(x0, uw0, y1, y2, amp=13, period=52)
+        )
+        # Right intact segment
+        parts.append(
+            self._dna_ladder(uw1, x1, y1, y2, amp=13, period=52)
+        )
+
+        # Unwound region — strands splayed apart
+        mid = (uw0 + uw1) // 2
+        parts += [
+            # Top strand arcs upward
+            f'<path d="M {uw0},{y1} C {mid},{y1-34} {mid},{y1-34} {uw1},{y1}" '
+            f'stroke="#3b82f6" stroke-width="2.8" fill="none"/>',
+            # Bottom strand arcs downward
+            f'<path d="M {uw0},{y2} C {mid},{y2+34} {mid},{y2+34} {uw1},{y2}" '
+            f'stroke="#06b6d4" stroke-width="2.8" fill="none"/>',
+
+            # gRNA hybridized to top (non-template) strand — red bar
+            f'<rect x="{uw0+4}" y="{y1-16}" width="{uw1-uw0-8}" height="10" '
+            f'rx="5" fill="#ef4444" opacity="0.75"/>',
+            f'<text x="{mid}" y="{y1-20}" text-anchor="middle" font-size="9" '
+            f'font-weight="700" fill="#dc2626">gRNA hybridized</text>',
+
+            # R-loop label
+            f'<text x="{mid}" y="{cy+5}" text-anchor="middle" font-size="10" '
+            f'fill="{self.colors["text_light"]}">R-loop</text>',
+
+            # Cas9 outline around the unwound zone
+            f'<ellipse cx="{mid}" cy="{cy}" rx="74" ry="52" fill="none" '
+            f'stroke="#2563eb" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5"/>',
+            f'<text x="{mid}" y="{cy+72}" text-anchor="middle" font-size="10" '
+            f'font-weight="600" fill="{self.colors["text"]}">DNA strand separation confirmed</text>',
+        ]
+        return "\n".join(parts)
+
+    def _ag_dna_break(self, cx: int, cy: int) -> str:
+        """Scene 4 — Cas9 cuts both DNA strands (double-strand break)."""
+        x0, x1 = cx - 230, cx + 230
+        y1, y2 = cy - 35, cy + 35
+        gap = 24   # gap at cut site
+
+        parts = []
+        # Left segment of both strands
+        parts.append(self._dna_ladder(x0, cx - gap, y1, y2, amp=13, period=52))
+        # Right segment
+        parts.append(self._dna_ladder(cx + gap, x1, y1, y2, amp=13, period=52))
+
+        # Break markers — jagged red cut lines
+        cut_color = "#ef4444"
+        for y_cut in (y1, y2):
+            parts += [
+                f'<polyline points="{cx-gap},{y_cut} {cx-8},{y_cut-8} {cx},{y_cut+6} '
+                f'{cx+8},{y_cut-8} {cx+gap},{y_cut}" '
+                f'stroke="{cut_color}" stroke-width="2.5" fill="none" '
+                f'stroke-linecap="round" stroke-linejoin="round"/>',
+            ]
+
+        # Scissors icon (two crossed lines)
+        sx, sy = cx, cy
+        parts += [
+            f'<circle cx="{sx}" cy="{sy}" r="18" fill="white" stroke="{cut_color}" stroke-width="1.5"/>',
+            f'<text x="{sx}" y="{sy+6}" text-anchor="middle" font-size="18">✂</text>',
+
+            # Label
+            f'<text x="{cx}" y="{cy+68}" text-anchor="middle" font-size="12" '
+            f'font-weight="700" fill="{cut_color}">Double-Strand Break</text>',
+            f'<text x="{cx}" y="{cy+82}" text-anchor="middle" font-size="10" '
+            f'fill="{self.colors["text_light"]}">Both strands cleaved — cell repair begins</text>',
+        ]
+        return "\n".join(parts)
+
+    def _ag_repair(self, cx: int, cy: int) -> str:
+        """Scene 5 — Two repair pathways: NHEJ (knockout) and HDR (precise edit)."""
+        mid = cx
+        lx, rx = cx - 130, cx + 50   # left/right panel origins
+        pw = 118                       # panel width
+        py = cy - 60
+        ph = 130
+
+        parts = [
+            # Divider
+            f'<line x1="{mid-4}" y1="{py-10}" x2="{mid-4}" y2="{py+ph+10}" '
+            f'stroke="#e2e8f0" stroke-width="1.5"/>',
+
+            # NHEJ panel
+            f'<rect x="{lx}" y="{py}" width="{pw}" height="{ph}" rx="6" '
+            f'fill="#fef3c7" stroke="#f59e0b" stroke-width="1.2"/>',
+            f'<text x="{lx+pw//2}" y="{py+18}" text-anchor="middle" font-size="11" '
+            f'font-weight="800" fill="#b45309">NHEJ</text>',
+            f'<text x="{lx+pw//2}" y="{py+32}" text-anchor="middle" font-size="9" '
+            f'fill="#92400e">Error-Prone Repair</text>',
+
+            # NHEJ — deletion shown as gap in DNA
+            f'<line x1="{lx+12}" y1="{py+58}" x2="{lx+44}" y2="{py+58}" '
+            f'stroke="#3b82f6" stroke-width="2.5"/>',
+            f'<line x1="{lx+64}" y1="{py+58}" x2="{lx+pw-12}" y2="{py+58}" '
+            f'stroke="#3b82f6" stroke-width="2.5"/>',
+            f'<text x="{lx+pw//2}" y="{py+55}" text-anchor="middle" font-size="9" '
+            f'fill="#ef4444">⊘ deletion</text>',
+            f'<line x1="{lx+12}" y1="{py+70}" x2="{lx+pw-12}" y2="{py+70}" '
+            f'stroke="#06b6d4" stroke-width="2.5"/>',
+
+            f'<text x="{lx+pw//2}" y="{py+95}" text-anchor="middle" font-size="10" '
+            f'font-weight="600" fill="#92400e">Gene Knockout</text>',
+            f'<text x="{lx+pw//2}" y="{py+110}" text-anchor="middle" font-size="9" '
+            f'fill="{self.colors["text_light"]}">Indels disrupt protein</text>',
+
+            # HDR panel
+            f'<rect x="{rx}" y="{py}" width="{pw}" height="{ph}" rx="6" '
+            f'fill="#dcfce7" stroke="#16a34a" stroke-width="1.2"/>',
+            f'<text x="{rx+pw//2}" y="{py+18}" text-anchor="middle" font-size="11" '
+            f'font-weight="800" fill="#15803d">HDR</text>',
+            f'<text x="{rx+pw//2}" y="{py+32}" text-anchor="middle" font-size="9" '
+            f'fill="#14532d">Template-Directed</text>',
+
+            # HDR — intact DNA with green edit marker
+            f'<line x1="{rx+12}" y1="{py+58}" x2="{rx+pw-12}" y2="{py+58}" '
+            f'stroke="#3b82f6" stroke-width="2.5"/>',
+            f'<rect x="{rx+40}" y="{py+52}" width="36" height="12" rx="3" '
+            f'fill="#16a34a" opacity="0.75"/>',
+            f'<text x="{rx+58}" y="{py+62}" text-anchor="middle" font-size="8" '
+            f'font-weight="700" fill="white">edit</text>',
+            f'<line x1="{rx+12}" y1="{py+70}" x2="{rx+pw-12}" y2="{py+70}" '
+            f'stroke="#06b6d4" stroke-width="2.5"/>',
+
+            f'<text x="{rx+pw//2}" y="{py+95}" text-anchor="middle" font-size="10" '
+            f'font-weight="600" fill="#15803d">Precise Edit</text>',
+            f'<text x="{rx+pw//2}" y="{py+110}" text-anchor="middle" font-size="9" '
+            f'fill="{self.colors["text_light"]}">Donor template inserted</text>',
+
+            f'<text x="{cx}" y="{py+ph+26}" text-anchor="middle" font-size="11" '
+            f'font-weight="600" fill="{self.colors["text"]}">Cell chooses repair pathway</text>',
+        ]
+        return "\n".join(parts)
+
+    def _ag_generic(self, idx: int, scene_text: str, cx: int, cy: int) -> str:
+        """Fallback scene for non-biological or unrecognized steps."""
+        c = self.colors
+        icon_r = 44
+        parts = [
+            f'<circle cx="{cx}" cy="{cy-10}" r="{icon_r}" fill="{c["primary"]}" opacity="0.12"/>',
+            f'<circle cx="{cx}" cy="{cy-10}" r="{icon_r}" fill="none" '
+            f'stroke="{c["primary"]}" stroke-width="2" opacity="0.3"/>',
+            f'<text x="{cx}" y="{cy-3}" text-anchor="middle" font-size="32" '
+            f'font-weight="900" fill="{c["primary"]}">{idx + 1}</text>',
+            f'<text x="{cx}" y="{cy+56}" text-anchor="middle" font-size="12" '
+            f'fill="{c["text_light"]}">{scene_text[:70]}</text>',
+        ]
+        return "\n".join(parts)
 
     def _render_comparison(self, plan: VisualizationPlan) -> str:
         """Render side-by-side comparison visualization"""
@@ -308,68 +685,13 @@ class SVGRenderer:
         
         return svg
 
-    def _render_interactive(self, plan: VisualizationPlan) -> str:  # noqa: ARG002
-        """Render interactive simulation template"""
-        svg = f"""<svg width="{self.svg_width}" height="{self.svg_height}" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
-  <rect width="{self.svg_width}" height="{self.svg_height}" fill="{self.colors['bg']}" />
-  
-  <!-- Title -->
-  <text x="300" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="{self.colors['text']}">
-    Interactive Simulation
-  </text>
-  
-  <!-- Visualization area -->
-  <rect x="50" y="60" width="500" height="200" fill="white" stroke="{self.colors['primary']}" stroke-width="2" rx="4"/>
-  
-  <!-- Visual representation -->
-  <circle cx="150" cy="120" r="35" fill="{self.colors['primary']}" opacity="0.7"/>
-  <circle cx="300" cy="140" r="40" fill="{self.colors['secondary']}" opacity="0.6"/>
-  <circle cx="450" cy="110" r="30" fill="{self.colors['accent']}" opacity="0.7"/>
-  
-  <text x="300" y="230" text-anchor="middle" font-size="12" fill="{self.colors['text_light']}">
-    System State Visualization (Real-time updates)
-  </text>
-  
-  <!-- Control panel -->
-  <rect x="50" y="270" width="500" height="100" fill="{self.colors['accent']}" opacity="0.08" stroke="{self.colors['accent']}" stroke-width="1" rx="4"/>
-  
-  <text x="70" y="290" font-size="13" font-weight="bold" fill="{self.colors['text']}">
-    Interactive Controls:
-  </text>
-  
-  <!-- Slider 1 -->
-  <text x="70" y="315" font-size="11" fill="{self.colors['text_light']}">
-    Parameter 1:
-  </text>
-  <rect x="150" y="305" width="150" height="8" fill="{self.colors['secondary']}" opacity="0.3" rx="4"/>
-  <rect x="150" y="305" width="75" height="8" fill="{self.colors['secondary']}" opacity="0.7" rx="4"/>
-  
-  <!-- Slider 2 -->
-  <text x="350" y="315" font-size="11" fill="{self.colors['text_light']}">
-    Parameter 2:
-  </text>
-  <rect x="450" y="305" width="80" height="8" fill="{self.colors['warning']}" opacity="0.3" rx="4"/>
-  <rect x="450" y="305" width="50" height="8" fill="{self.colors['warning']}" opacity="0.7" rx="4"/>
-  
-  <!-- Buttons -->
-  <rect x="70" y="335" width="80" height="25" fill="{self.colors['success']}" opacity="0.3" stroke="{self.colors['success']}" stroke-width="1" rx="3"/>
-  <text x="110" y="353" text-anchor="middle" font-size="11" fill="{self.colors['text']}">
-    Reset
-  </text>
-  
-  <rect x="165" y="335" width="80" height="25" fill="{self.colors['success']}" opacity="0.3" stroke="{self.colors['success']}" stroke-width="1" rx="3"/>
-  <text x="205" y="353" text-anchor="middle" font-size="11" fill="{self.colors['text']}">
-    Run
-  </text>
-  
-  <rect x="260" y="335" width="130" height="25" fill="{self.colors['secondary']}" opacity="0.3" stroke="{self.colors['secondary']}" stroke-width="1" rx="3"/>
-  <text x="325" y="353" text-anchor="middle" font-size="11" fill="{self.colors['text']}">
-    Adjust Parameters
-  </text>
-</svg>"""
-        
-        return svg
+    def _render_interactive(self, plan: VisualizationPlan) -> str:
+        """
+        SVG embedded via dangerouslySetInnerHTML cannot carry live JS events,
+        so interactive controls would be inert. Fall back to the step-by-step
+        animation renderer which works correctly in this context.
+        """
+        return self._render_animation(plan)
 
     def _render_3d(self, plan: VisualizationPlan) -> str:
         """Render a 3D scene payload as an embeddable HTML container."""
