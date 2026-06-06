@@ -161,9 +161,15 @@ class SVGRenderer:
         """
         scenes = [s for s in plan.scenes if s.strip()][:6]
 
-        # Check if this is a molecular biology process (CRISPR, enzyme kinetics, etc.)
-        is_molecular = any(keyword in str(plan.scenes).lower()
-                          for keyword in ['dna', 'protein', 'enzyme', 'cas9', 'grna', 'hybrid'])
+        # Check if this is a molecular biology process
+        # Look for keywords in: scenes, guide text, annotations
+        scene_text = ' '.join([str(s) for s in plan.scenes]).lower()
+        guide_text = (plan.guide or '').lower()
+        annotation_text = ' '.join([str(a.label) for a in (plan.annotations or [])]).lower()
+        combined_text = f"{scene_text} {guide_text} {annotation_text}"
+
+        molecular_keywords = ['dna', 'protein', 'enzyme', 'cas', 'rna', 'strand', 'nucleotide']
+        is_molecular = any(kw in combined_text for kw in molecular_keywords)
 
         if is_molecular:
             return self._render_molecular_animation(plan, scenes)
