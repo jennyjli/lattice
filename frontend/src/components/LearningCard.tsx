@@ -148,6 +148,24 @@ export default function LearningCard({ data, onSave, isSaved, isSaving }: Props)
           <p className="text-gray-800 leading-relaxed">{card.summary}</p>
         </section>
 
+        {/* ── Visual (particle viewer or SVG) ── */}
+        {(has3D || visualization.svg) && (
+          <>
+            <Divider />
+            <section>
+              <SectionLabel>Visual</SectionLabel>
+              {has3D && visualization.scene_data ? (
+                <ThreeDViewer sceneData={visualization.scene_data} />
+              ) : visualization.svg ? (
+                <div
+                  className="rounded-lg overflow-hidden border border-gray-100"
+                  dangerouslySetInnerHTML={{ __html: visualization.svg }}
+                />
+              ) : null}
+            </section>
+          </>
+        )}
+
         <Divider />
 
         {/* ── How It Works ── */}
@@ -186,24 +204,6 @@ export default function LearningCard({ data, onSave, isSaved, isSaving }: Props)
               ))}
             </div>
           </section>
-        )}
-
-        {/* ── Visual (particle viewer or SVG) ── */}
-        {(has3D || visualization.svg) && (
-          <>
-            <Divider />
-            <section>
-              <SectionLabel>Visual</SectionLabel>
-              {has3D && visualization.scene_data ? (
-                <ThreeDViewer sceneData={visualization.scene_data} />
-              ) : visualization.svg ? (
-                <div
-                  className="rounded-lg overflow-hidden border border-gray-100"
-                  dangerouslySetInnerHTML={{ __html: visualization.svg }}
-                />
-              ) : null}
-            </section>
-          </>
         )}
 
         <Divider />
