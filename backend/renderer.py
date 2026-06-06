@@ -151,13 +151,27 @@ class SVGRenderer:
 
     def _render_animation(self, plan: VisualizationPlan) -> str:
         """
-        Sequential step-by-step process animation.
+        Continuous molecular process animation with smooth transformations.
 
-        Each scene occupies an exclusive time window — no overlap.
-        Scene graphics are selected from domain-aware helpers based on
-        keywords in the scene description (gRNA, cut, repair, etc.).
+        Instead of static slides, this creates a timeline where:
+        - Elements move and transform smoothly
+        - Multiple processes occur simultaneously
+        - Visual state changes (color, glow, position) convey the process
+        - Complexity builds progressively from simple to detailed
         """
         scenes = [s for s in plan.scenes if s.strip()][:6]
+
+        # Check if this is a molecular biology process (CRISPR, enzyme kinetics, etc.)
+        is_molecular = any(keyword in str(plan.scenes).lower()
+                          for keyword in ['dna', 'protein', 'enzyme', 'cas9', 'grna', 'hybrid'])
+
+        if is_molecular:
+            return self._render_molecular_animation(plan, scenes)
+        else:
+            return self._render_slide_animation(plan, scenes)
+
+    def _render_slide_animation(self, plan: VisualizationPlan, scenes: list) -> str:
+        """Original slide-based animation (non-molecular processes)."""
         n = len(scenes) or 1
         sps = 5                   # seconds per scene
         total = n * sps
@@ -193,6 +207,264 @@ class SVGRenderer:
             f'{scene_groups}'
             f'</svg>'
         )
+
+    def _render_molecular_animation(self, plan: VisualizationPlan, scenes: list) -> str:
+        """Continuous molecular animation with smooth state transitions."""
+        W, H = self.svg_width, self.svg_height
+        total_duration = 18  # seconds
+
+        # Compute phase timings so processes overlap naturally
+        phases = self._compute_animation_phases(scenes, total_duration)
+
+        # Build CSS animations for each element
+        styles = self._build_molecular_animations(phases, total_duration)
+
+        # Build persistent SVG elements that animate
+        svg_content = self._build_continuous_svg(phases, W, H)
+
+        return (
+            f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg">'
+            f'<defs>'
+            f'<style>{styles}</style>'
+            f'<linearGradient id="dnaGrad" x1="0%" y1="0%" x2="100%"><stop offset="0%" stop-color="#3b82f6" stop-opacity="0.8"/><stop offset="100%" stop-color="#06b6d4" stop-opacity="0.8"/></linearGradient>'
+            f'<filter id="glow"><feGaussianBlur stdDeviation="2" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+            f'</defs>'
+            f'<rect width="{W}" height="{H}" fill="#f8fafc" rx="6"/>'
+            f'{svg_content}'
+            f'</svg>'
+        )
+
+    def _compute_animation_phases(self, scenes: list, total_duration: float) -> dict:
+        """Compute timing phases for smooth molecular process animation."""
+        phases = {}
+
+        # Map scene keywords to animation phases with timing
+        # Phases overlap to create smooth transitions
+        phases['dna_base'] = {'start': 0, 'duration': total_duration, 'opacity': 1.0}  # DNA always visible
+
+        # Scanning phase (0-25% of timeline)
+        phases['scanning'] = {'start': 0, 'duration': 0.25 * total_duration}
+
+        # Binding phase (20-45%)
+        phases['binding'] = {'start': 0.20 * total_duration, 'duration': 0.25 * total_duration}
+
+        # Unwinding phase (40-70%)
+        phases['unwinding'] = {'start': 0.40 * total_duration, 'duration': 0.30 * total_duration}
+
+        # Cutting phase (65-80%)
+        phases['cutting'] = {'start': 0.65 * total_duration, 'duration': 0.15 * total_duration}
+
+        # Repair phase (75-100%)
+        phases['repair'] = {'start': 0.75 * total_duration, 'duration': 0.25 * total_duration}
+
+        return phases
+
+    def _build_molecular_animations(self, phases: dict, duration: float) -> str:
+        """Build CSS keyframe animations for molecular elements."""
+        styles = []
+
+        # DNA backbone (persistent, subtle glow changes)
+        styles.append(f"""
+        .dna-backbone {{ animation: dna-pulse {duration}s infinite; }}
+        @keyframes dna-pulse {{
+            0%, 100% {{ opacity: 0.7; filter: url(#glow); }}
+            50% {{ opacity: 0.9; filter: url(#glow); }}
+        }}
+        """)
+
+        # Cas9 scanning motion (left-to-right, with pauses at potential PAM sites)
+        scan_start = phases['scanning']['start']
+        scan_end = scan_start + phases['scanning']['duration']
+        scan_pct_start = (scan_start / duration) * 100
+        scan_pct_end = (scan_end / duration) * 100
+
+        styles.append(f"""
+        .cas9-complex {{ animation: cas9-scan {duration}s infinite; }}
+        @keyframes cas9-scan {{
+            0%, {scan_pct_start:.1f}% {{ transform: translateX(-150px); opacity: 0; }}
+            {scan_pct_start:.1f}%, {scan_pct_end:.1f}% {{
+                opacity: 1;
+                animation-timing-function: linear;
+                transform: translateX(var(--scan-pos, -150px));
+            }}
+            {scan_pct_end:.1f}%, 100% {{ transform: translateX(100px); opacity: 0.3; }}
+        }}
+        """)
+
+        # DNA unwinding (strands spread apart) - become visible and arc apart
+        unwind_start = phases['unwinding']['start']
+        unwind_end = unwind_start + phases['unwinding']['duration']
+        unwind_pct_start = (unwind_start / duration) * 100
+        unwind_pct_end = (unwind_end / duration) * 100
+
+        styles.append(f"""
+        .dna-top-strand {{ animation: dna-unwind-top {duration}s infinite; }}
+        .dna-bottom-strand {{ animation: dna-unwind-bottom {duration}s infinite; }}
+        @keyframes dna-unwind-top {{
+            0%, {unwind_pct_start:.1f}% {{ opacity: 0; transform: translateY(0) scaleY(1); }}
+            {unwind_pct_start:.1f}%, {unwind_pct_end:.1f}% {{ opacity: 1; transform: translateY(-32px) scaleY(1.1); }}
+            {unwind_pct_end:.1f}%, 100% {{ opacity: 0.5; transform: translateY(-15px) scaleY(1); }}
+        }}
+        @keyframes dna-unwind-bottom {{
+            0%, {unwind_pct_start:.1f}% {{ opacity: 0; transform: translateY(0) scaleY(1); }}
+            {unwind_pct_start:.1f}%, {unwind_pct_end:.1f}% {{ opacity: 1; transform: translateY(32px) scaleY(1.1); }}
+            {unwind_pct_end:.1f}%, 100% {{ opacity: 0.5; transform: translateY(15px) scaleY(1); }}
+        }}
+        """)
+
+        # gRNA hybridization (appears and lights up during binding phase through unwinding)
+        # Starts showing around binding, peaks during unwinding
+        bind_start = phases['binding']['start']
+        unwind_end = phases['unwinding']['start'] + phases['unwinding']['duration']
+        bind_pct_start = (bind_start / duration) * 100
+        unwind_pct_end = (unwind_end / duration) * 100
+
+        styles.append(f"""
+        .grna-hybrid {{ animation: grna-bind {duration}s infinite; }}
+        @keyframes grna-bind {{
+            0%, {bind_pct_start:.1f}% {{ opacity: 0; stroke-width: 1; }}
+            {bind_pct_start + 2:.1f}%, {unwind_pct_end - 1:.1f}% {{ opacity: 1; stroke-width: 3; filter: url(#glow); }}
+            {unwind_pct_end:.1f}%, 100% {{ opacity: 0; stroke-width: 1; }}
+        }}
+        """)
+
+        # DNA cutting effect
+        cut_start = phases['cutting']['start']
+        cut_end = cut_start + phases['cutting']['duration']
+        cut_pct_start = (cut_start / duration) * 100
+        cut_pct_end = (cut_end / duration) * 100
+
+        styles.append(f"""
+        .dna-cut {{ animation: dna-break {duration}s infinite; }}
+        @keyframes dna-break {{
+            0%, {cut_pct_start:.1f}% {{ opacity: 0; transform: scale(0); }}
+            {cut_pct_start:.1f}%, {cut_pct_end:.1f}% {{ opacity: 1; transform: scale(1); }}
+            {cut_pct_end:.1f}%, 100% {{ opacity: 1; }}
+        }}
+        """)
+
+        # Status text transitions
+        styles.append(f"""
+        .status-text {{ animation: status-fade {duration}s infinite; }}
+        @keyframes status-fade {{
+            0% {{ opacity: 0; }}
+            5% {{ opacity: 1; }}
+            95% {{ opacity: 1; }}
+            100% {{ opacity: 0; }}
+        }}
+        """)
+
+        return "\n".join(styles)
+
+    def _build_continuous_svg(self, phases: dict, W: int, H: int) -> str:
+        """Build SVG elements for continuous molecular animation."""
+        cx, cy = W // 2, H // 2 - 10
+
+        svg_parts = []
+
+        # Title with progress
+        svg_parts.append(f'''
+        <text x="{W//2}" y="30" text-anchor="middle" font-size="16" font-weight="700" fill="{self.colors['text']}">
+            CRISPR-Cas9 Gene Editing Process
+        </text>
+        ''')
+
+        # Base DNA structure (persistent)
+        x0, x1 = cx - 180, cx + 180
+        y1, y2 = cy - 40, cy + 40
+
+        svg_parts.append(f'''
+        <g class="dna-backbone">
+            {self._dna_ladder(x0, x1, y1, y2, amp=14, period=56)}
+        </g>
+        ''')
+
+        # Cas9-gRNA complex (moves across the DNA)
+        cas9_x = cx - 120
+        svg_parts.append(f'''
+        <g class="cas9-complex">
+            <!-- Cas9 protein -->
+            <ellipse cx="{cas9_x}" cy="{cy-5}" rx="50" ry="38" fill="#2563eb" opacity="0.85"/>
+            <ellipse cx="{cas9_x+12}" cy="{cy+8}" rx="24" ry="18" fill="#1e40af" opacity="0.4"/>
+            <text x="{cas9_x}" y="{cy+4}" text-anchor="middle" font-size="11" font-weight="800" fill="white">Cas9</text>
+
+            <!-- gRNA -->
+            <path d="M {cas9_x+42},{cy-18} C {cas9_x+58},{cy-26} {cas9_x+74},{cy-10} {cas9_x+90},{cy-18}"
+                  stroke="#ef4444" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.8"/>
+            <text x="{cas9_x+66}" y="{cy-28}" text-anchor="middle" font-size="9" font-weight="600" fill="#ef4444">gRNA</text>
+
+            <!-- Scanning glow -->
+            <circle cx="{cas9_x}" cy="{cy-5}" r="56" fill="none" stroke="#0ea5e9" stroke-width="1" opacity="0.4" stroke-dasharray="4,2"/>
+        </g>
+        ''')
+
+        # gRNA-DNA hybridization indicator (appears during unwinding)
+        mid = (x0 + x1) // 2
+        svg_parts.append(f'''
+        <g class="grna-hybrid">
+            <rect x="{mid-60}" y="{y1-18}" width="120" height="12" rx="6"
+                  fill="#ef4444" opacity="0.6" filter="url(#glow)"/>
+            <text x="{mid}" y="{y1-32}" text-anchor="middle" font-size="9" font-weight="700" fill="#dc2626">
+                gRNA hybridized
+            </text>
+        </g>
+        ''')
+
+        # DNA cut indicator
+        svg_parts.append(f'''
+        <g class="dna-cut">
+            <circle cx="{mid}" cy="{cy}" r="16" fill="none" stroke="#ef4444" stroke-width="2"/>
+            <text x="{mid}" y="{cy+6}" text-anchor="middle" font-size="18">✂</text>
+        </g>
+        ''')
+
+        # Animated strands (show unwinding) - these start invisible and arc apart during unwinding
+        svg_parts.append(f'''
+        <defs>
+            <style>
+                .dna-top-strand {{ opacity: 0; }}
+                .dna-bottom-strand {{ opacity: 0; }}
+                .unwind-phase-start {{ --unwind-start: 7.2; }}
+            </style>
+        </defs>
+        <g class="dna-top-strand">
+            <path d="M {x0},{y1} L {mid-40},{y1-35} L {x1},{y1}"
+                  stroke="#3b82f6" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="{mid}" y="{y1-48}" text-anchor="middle" font-size="9" font-weight="600" fill="#3b82f6" opacity="0.7">
+                Non-template strand
+            </text>
+        </g>
+        <g class="dna-bottom-strand">
+            <path d="M {x0},{y2} L {mid-40},{y2+35} L {x1},{y2}"
+                  stroke="#06b6d4" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="{mid}" y="{y2+48}" text-anchor="middle" font-size="9" font-weight="600" fill="#06b6d4" opacity="0.7">
+                Template strand
+            </text>
+        </g>
+        ''')
+
+        # Status text
+        svg_parts.append(f'''
+        <text class="status-text" x="{W//2}" y="{H-20}" text-anchor="middle" font-size="11" fill="{self.colors['text_light']}">
+            Scanning DNA for PAM site... Finding target... Binding... Unwinding strands... Cutting DNA...
+        </text>
+        ''')
+
+        # Progress bar
+        svg_parts.append(f'''
+        <rect x="40" y="{H-8}" width="{W-80}" height="2" rx="1" fill="{self.colors['secondary']}" opacity="0.15"/>
+        <rect class="progress-bar" x="40" y="{H-8}" width="{W-80}" height="2" rx="1"
+              fill="{self.colors['primary']}"
+              style="animation: progress-fill 18s infinite linear;"/>
+        <style>
+            @keyframes progress-fill {{
+                0% {{ width: 0; }}
+                100% {{ width: {W-80}px; }}
+            }}
+        </style>
+        ''')
+
+        return "\n".join(svg_parts)
 
     # ── Animation scene dispatcher ─────────────────────────────────────────────
 

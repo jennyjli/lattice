@@ -67,7 +67,13 @@ class VisualizationPlanner:
         recs = set(analysis.recommended_visualization)
         has_mechanisms = bool(analysis.mechanisms)
 
-        # 3D/spatial always wins — handled by its own renderer
+        # Animation + mechanisms beats 3d: "How does X work?" is a process
+        # question, not a structural one. Only go 3d when animation isn't
+        # recommended alongside it, or the concept has no sequential steps.
+        if "animation" in recs and has_mechanisms:
+            return "animation"
+
+        # 3D/spatial for structural/spatial concepts with no process animation
         if "3d" in recs or "spatial" in recs:
             return "3d"
 
@@ -75,14 +81,8 @@ class VisualizationPlanner:
         if "comparison" in recs:
             return "comparison"
 
-        # Animation wins over interactive whenever the concept has sequential
-        # mechanisms. "Interactive" is only appropriate for truly parametric
-        # simulations (e.g. gas laws, pendulum) — not for biological processes.
-        if "animation" in recs:
-            return "animation"
-
+        # Interactive + mechanisms → animate the steps instead
         if "interactive" in recs and has_mechanisms:
-            # Biological/chemical mechanisms have clear steps; animate them.
             return "animation"
 
         if "timeline" in recs:
