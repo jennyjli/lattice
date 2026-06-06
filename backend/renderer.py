@@ -169,11 +169,17 @@ class SVGRenderer:
         combined_text = f"{scene_text} {guide_text} {annotation_text}"
 
         molecular_keywords = ['dna', 'protein', 'enzyme', 'cas', 'rna', 'strand', 'nucleotide']
-        is_molecular = any(kw in combined_text for kw in molecular_keywords)
+        matched_keywords = [kw for kw in molecular_keywords if kw in combined_text]
+        is_molecular = bool(matched_keywords)
 
         if is_molecular:
+            print(f"🧬 [renderer] MOLECULAR animation → matched keywords: {matched_keywords}")
             return self._render_molecular_animation(plan, scenes)
         else:
+            print(f"⚠️  [renderer] FALLBACK slide animation (no molecular keywords found)")
+            print(f"   scenes:      {plan.scenes}")
+            print(f"   guide:       {plan.guide!r}")
+            print(f"   annotations: {[a.label for a in (plan.annotations or [])]}")
             return self._render_slide_animation(plan, scenes)
 
     def _render_slide_animation(self, plan: VisualizationPlan, scenes: list) -> str:
