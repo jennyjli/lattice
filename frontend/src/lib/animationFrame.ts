@@ -374,19 +374,21 @@ function drawStrand(a: FActor, st: ActorState, proc: Proc): string {
   const cx = sx(st.x), cy = sy(st.y);
   const color = a.color ?? '#ef4444';
   const w = 92 * (a.size ?? 1);
-  const path = `M ${cx - w / 2},${cy} C ${cx - w / 4},${cy - 18} ${cx - w / 8},${cy + 18} ${cx},${cy} ` +
-               `C ${cx + w / 8},${cy - 18} ${cx + w / 4},${cy + 18} ${cx + w / 2},${cy}`;
+  // Keep the squiggle shallow so it doesn't reach into a protein sitting below.
+  const path = `M ${cx - w / 2},${cy} C ${cx - w / 4},${cy - 11} ${cx - w / 8},${cy + 11} ${cx},${cy} ` +
+               `C ${cx + w / 8},${cy - 11} ${cx + w / 4},${cy + 11} ${cx + w / 2},${cy}`;
   const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
   out.push(`<path d="${path}" stroke="${color}" stroke-width="3.6" fill="none" stroke-linecap="round"/>`);
-  // letters ride the strand until the zip takes over
+  // Label and letters go ABOVE the strand — the guide RNA usually sits just above
+  // the protein, so anything below would collide with (and hide behind) it.
+  if (a.label) out.push(`<text x="${cx}" y="${(cy - 30).toFixed(1)}" text-anchor="middle" font-size="14" font-weight="700" fill="${color}">${esc(a.label)}</text>`);
   if (a.sequence && proc.hybridize < 0.05) {
     const seq = a.sequence.toUpperCase();
     for (let i = 0; i < seq.length; i++) {
       const lx = cx - w / 2 + (w / seq.length) * (i + 0.5);
-      out.push(`<text x="${lx.toFixed(1)}" y="${(cy - 15).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" fill="${color}" font-family="ui-monospace, monospace">${seq[i]}</text>`);
+      out.push(`<text x="${lx.toFixed(1)}" y="${(cy - 14).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" fill="${color}" font-family="ui-monospace, monospace">${seq[i]}</text>`);
     }
   }
-  if (a.label) out.push(`<text x="${cx}" y="${cy + 28}" text-anchor="middle" font-size="14" font-weight="700" fill="${color}">${esc(a.label)}</text>`);
   out.push('</g>');
   return out.join('');
 }
