@@ -34,30 +34,48 @@ from analyzer import ConceptAnalysis
 # animation_spec.Shape / Action.
 _VOCAB = """\
 COORDINATE SPACE: normalized 0-100 on both axes, origin top-left. The DNA/main
-structure usually sits horizontally around y=50.
+structure usually sits horizontally around y=50; proteins sit just above it.
 
 SHAPES (an actor's `shape`):
-- "double_helix": a nucleic-acid duplex. Set `span`: [x0, x1] (e.g. [10, 90]).
-- "protein": a bilobed enzyme/protein blob (e.g. Cas9, a polymerase). Set `at`.
-- "strand": a single strand / guide RNA (squiggle). Set `at`.
+- "double_helix": a nucleic-acid duplex. Set `span`: [x0, x1] (e.g. [6, 94]).
+  Optionally set `sequence` (e.g. "GACTTGCCAG") to show readable bases, and
+  `mutation_index` (int) to flag one base as a disease mutation.
+- "protein": an enzyme/protein with a DNA-binding groove (e.g. Cas9, a
+  polymerase). Set `at` ABOVE the DNA (e.g. y≈33), and a `description`.
+- "strand": a single strand / guide RNA. Set `at`; optionally `sequence`.
 - "molecule": a small molecule, ligand, or ion. Set `at`.
 - "membrane": a lipid bilayer. Set `span`.
-- "label": free-floating text (use the actor's `label`). Set `at`.
+- "label": free-floating text callout (e.g. a PAM site). Set `at`, `label`.
+
+Give every important actor a one-sentence `description` — shown on hover so the
+learner can ask "what is this?".
 
 ACTIONS (a timeline event's `action`):
-- "appear": fade the actor in.
-- "disappear": fade the actor out.
-- "move": translate the actor to `to`: [x, y] over `dur` seconds.
-- "pulse": glow/emphasis (use when something binds or is recognized).
-- "unwind": splay a double_helix open at `at_x` (only valid on a double_helix).
-- "cut": show a double-strand break at `at_x` (on a double_helix/strand).
-- "repair": heal/edit marker at `at_x`. Set `mode`: "hdr" (precise edit),
-  "nhej" (error-prone knockout), or "generic".
+- "appear" / "disappear": fade in / out.
+- "move": translate to `to`: [x, y] over `dur` seconds (use easing-friendly paths).
+- "pulse": glow/emphasis (use when something is recognized).
+- "unwind": splay a double_helix open at `at_x` (reveals the letters underneath).
+- "hybridize": zip a strand's letters onto the matching DNA bases at `at_x` — use
+  this to SHOW why binding is specific (base-by-base matching). Put it on the strand.
+- "highlight": emphasize a base/region at `at_x`. Set `mode`: "mutation" to mark
+  the disease base.
+- "grip": a protein clamps shut on `at_x` (open → closed) just before cutting.
+- "cut": double-strand break at `at_x`.
+- "repair": heal/edit marker at `at_x`. Set `mode`: "correct" (fix the mutation),
+  "hdr" (precise edit), or "nhej" (knockout).
 
-Every event needs `at` (start seconds) and `actor` (an actor id). Add a short
-`caption` to the key events — these become the synchronized status line.
-The final event should show the process COMPLETING (e.g. a "repair"/result),
-never stopping mid-way."""
+CAMERA (optional `camera`: list of keyframes): each has `at`, `center`: [x, y],
+`zoom` (1 = whole stage, ~2 = close-up), `dur`. Establish wide, ZOOM IN on the
+key mechanism (the binding/cut), then PULL BACK for the result. This is what
+makes it feel cinematic instead of like slides.
+
+PRINCIPLES:
+- The VISUAL must carry the explanation; captions only narrate. Show cause and
+  effect (e.g. matching letters), not just steps.
+- Tell a why → how → payoff story. The final event must show the process
+  COMPLETING (a repair/result), never stop mid-way.
+- Prefer 3-6 actors and 8-16 events. Every event needs `at` and `actor`; add a
+  short `caption` to the key beats."""
 
 
 class AnimationDirector:

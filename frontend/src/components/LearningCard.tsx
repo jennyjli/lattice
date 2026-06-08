@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { ConceptExplanationResponse, KnowledgeGap } from '@/types';
 import ThreeDViewer from './ThreeDViewer';
+import AnimationPlayer from './AnimationPlayer';
 
 interface Props {
   data: ConceptExplanationResponse;
@@ -78,6 +79,8 @@ export default function LearningCard({ data, onSave, isSaved, isSaving }: Props)
     visualization.type === '3d' &&
     visualization.scene_data?.render_mode === 'particles';
 
+  const hasSpec = !!visualization.spec && (visualization.spec.actors?.length ?? 0) > 0;
+
   const depth = DEPTH_CONFIG[user_state.depth_mode] ?? DEPTH_CONFIG.first_look;
 
   return (
@@ -148,13 +151,15 @@ export default function LearningCard({ data, onSave, isSaved, isSaving }: Props)
           <p className="text-gray-800 leading-relaxed">{card.summary}</p>
         </section>
 
-        {/* ── Visual (particle viewer or SVG) ── */}
-        {(has3D || visualization.svg) && (
+        {/* ── Visual (animation player, particle viewer, or SVG) ── */}
+        {(hasSpec || has3D || visualization.svg) && (
           <>
             <Divider />
             <section>
               <SectionLabel>Visual</SectionLabel>
-              {has3D && visualization.scene_data ? (
+              {hasSpec && visualization.spec ? (
+                <AnimationPlayer spec={visualization.spec} />
+              ) : has3D && visualization.scene_data ? (
                 <ThreeDViewer sceneData={visualization.scene_data} />
               ) : visualization.svg ? (
                 <div

@@ -136,6 +136,7 @@ export interface ConceptExplanationResponse {
     type: string;
     scene_data?: SceneData;
     svg?: string;
+    spec?: AnimationSpec;
   };
   knowledge_gaps: KnowledgeGap[];
   user_state: {
@@ -187,34 +188,17 @@ export interface NoteContent {
 }
 
 // ── Animation spec (LLM-directed visualization) ──────────────────────────────
+// The animation frame renderer (src/lib/animationFrame.ts) is the single source
+// of truth for these shapes; re-export them here under friendlier names.
 
-export interface AnimationActor {
-  id: string;
-  shape: string;
-  label?: string;
-  color?: string;
-  at?: [number, number];
-  span?: [number, number];
-  size?: number;
-}
+import type {
+  FActor as AnimationActor,
+  FEvent as AnimationEvent,
+  FCamera as AnimationCamera,
+  FSpec as AnimationSpec,
+} from '@/lib/animationFrame';
 
-export interface AnimationEvent {
-  at: number;
-  action: string;
-  actor: string;
-  dur?: number;
-  to?: [number, number];
-  at_x?: number;
-  mode?: string;
-  caption?: string;
-}
-
-export interface AnimationSpec {
-  title: string;
-  duration: number;
-  actors: AnimationActor[];
-  events: AnimationEvent[];
-}
+export type { AnimationActor, AnimationEvent, AnimationCamera, AnimationSpec };
 
 export interface SampleSpec {
   name: string;

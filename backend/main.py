@@ -55,29 +55,30 @@ concept_studio  = ConceptStudio()
 
 # ── Visualization helper ──────────────────────────────────────────────────────
 
-def render_visualization(concept_name: str, analysis: ConceptAnalysis, plan: VisualizationPlan) -> str:
+def render_visualization(
+    concept_name: str, analysis: ConceptAnalysis, plan: VisualizationPlan
+) -> tuple[str, Optional[dict]]:
     """
-    Render the visualization for a plan.
+    Build the visualization for a plan.
 
-    For animations we first try the Tier-1 LLM "director": Gemini emits a
-    declarative AnimationSpec that a single generic renderer plays — this
-    generalizes to any process and shows it completing. If the director is
-    unavailable or returns an invalid spec, we fall back to the procedural
-    renderer (and ultimately its own fallbacks).
+    Returns (svg, spec_dict). For animations we first try the Tier-1 LLM
+    "director": Gemini emits a declarative AnimationSpec, which the frontend
+    <AnimationPlayer> plays richly (the spec_dict) and which we also rasterize to
+    a static SVG fallback. If the director is unavailable or returns an invalid
+    spec, we use a hand-authored spec for known concepts, else the procedural
+    renderer (spec_dict is None in that case).
     """
     if plan.visualization_type == "animation":
         spec = anim_director.direct(concept_name, analysis)
-        # If the director is unavailable (e.g. transient LLM outage), use a
-        # hand-authored spec when we have one for this concept, so well-known
-        # processes still render the complete, high-quality animation.
         if spec is None:
             spec = _builtin_spec_for(concept_name, analysis)
         if spec is not None:
             try:
-                return renderer.render_spec(spec)
+                return renderer.render_spec(spec), spec.model_dump(exclude_none=True)
             except Exception as e:
                 print(f"⚠️  render_spec failed ({e}); falling back to procedural renderer")
-    return renderer.render(plan, concept_text=concept_name, analysis_data=analysis.model_dump())
+    svg = renderer.render(plan, concept_text=concept_name, analysis_data=analysis.model_dump())
+    return svg, None
 
 
 def _builtin_spec_for(concept_name: str, analysis: ConceptAnalysis):
@@ -198,7 +199,7 @@ async def generate(request: GenerateRequest) -> dict:
             query = web_researcher.get_search_query(request.text, analysis.entities)
             research_data = web_researcher.search_concept(query)
         plan = planner.plan(analysis, research_data=research_data)
-        svg = render_visualization(request.text, analysis, plan)
+        svg, _spec = render_visualization(request.text, analysis, plan)
         return {"analysis": analysis, "plan": plan, "svg": svg}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
@@ -259,7 +260,7 @@ async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)
             query = web_researcher.get_search_query(primary, analysis.entities)
             research_data = web_researcher.search_concept(query)
         plan = planner.plan(analysis, research_data=research_data)
-        svg  = render_visualization(primary, analysis, plan)
+        svg, viz_spec = render_visualization(primary, analysis, plan)
 
         # 5 — persist concept + encounter
         card_dict = card.to_dict()
@@ -297,6 +298,7 @@ async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)
                 "type":       plan.visualization_type,
                 "scene_data": plan.scene_data,
                 "svg":        svg,
+                "spec":       viz_spec,
             },
             "knowledge_gaps": gaps,
             "user_state": {
