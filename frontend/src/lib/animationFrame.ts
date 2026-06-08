@@ -47,12 +47,19 @@ export interface FSpec {
   camera?: FCamera[];
 }
 
-export interface FrameOpts { hoverId?: string | null; }
+export interface FrameOpts {
+  hoverId?: string | null;
+  /** When true, omit the in-SVG title/caption (the player draws them as HTML). */
+  hideChrome?: boolean;
+}
 
 // ── Stage geometry ───────────────────────────────────────────────────────────
 
-const VIEW_W = 1000, VIEW_H = 600;
-const STAGE_X = 40, STAGE_Y = 70, STAGE_W = 920, STAGE_H = 430;
+// Wider, shorter frame so the scene fills more of the box (less dead space),
+// and the stage uses nearly the full height — title/caption are drawn as crisp
+// HTML chrome by the player, not shrunk inside the SVG.
+const VIEW_W = 1000, VIEW_H = 470;
+const STAGE_X = 24, STAGE_Y = 30, STAGE_W = 952, STAGE_H = 412;
 const SCREEN_CX = STAGE_X + STAGE_W / 2;
 const SCREEN_CY = STAGE_Y + STAGE_H / 2;
 
@@ -207,18 +214,18 @@ function drawDNA(a: FActor, st: ActorState, proc: Proc): string {
   const span = a.span ?? [10, 90];
   const x0 = sx(span[0]), x1 = sx(span[1]);
   const yc = sy((a.at ?? [50, 50])[1]);
-  const amp = 16, period = 60;
+  const amp = 22, period = 66;
   const out: string[] = [];
 
   out.push(`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`);
   // backbones
-  out.push(`<path d="${helixPath(x0, x1, yc, amp, period, 0)}" stroke="#3b82f6" stroke-width="3" fill="none" stroke-linecap="round"/>`);
-  out.push(`<path d="${helixPath(x0, x1, yc, amp, period, Math.PI)}" stroke="#06b6d4" stroke-width="3" fill="none" stroke-linecap="round"/>`);
+  out.push(`<path d="${helixPath(x0, x1, yc, amp, period, 0)}" stroke="#3b82f6" stroke-width="3.6" fill="none" stroke-linecap="round"/>`);
+  out.push(`<path d="${helixPath(x0, x1, yc, amp, period, Math.PI)}" stroke="#06b6d4" stroke-width="3.6" fill="none" stroke-linecap="round"/>`);
   // faint rungs
   for (let x = x0; x <= x1; x += period / 4) {
     const yt = yc + amp * Math.sin((2 * Math.PI * (x - x0)) / period);
     const yb = yc + amp * Math.sin((2 * Math.PI * (x - x0)) / period + Math.PI);
-    out.push(`<line x1="${x.toFixed(1)}" y1="${yt.toFixed(1)}" x2="${x.toFixed(1)}" y2="${yb.toFixed(1)}" stroke="#bfdbfe" stroke-width="1.4" opacity="0.6"/>`);
+    out.push(`<line x1="${x.toFixed(1)}" y1="${yt.toFixed(1)}" x2="${x.toFixed(1)}" y2="${yb.toFixed(1)}" stroke="#bfdbfe" stroke-width="1.8" opacity="0.6"/>`);
   }
   out.push('</g>');
 
@@ -238,12 +245,12 @@ function drawTargetLadder(dna: FActor, yc: number, proc: Proc): string {
   const seq = (dna.sequence ?? '').toUpperCase();
   const n = seq.length;
   if (!n) return '';
-  const winW = Math.min(360, 34 * n);
+  const winW = Math.min(0.72 * STAGE_W, 46 * n);
   const cx = sx(proc.targetX);
   const x0 = cx - winW / 2;
   const step = winW / n;
-  const topY = yc - 26, botY = yc + 26;
-  const gap = ease(proc.cut) * (1 - proc.repair) * 26; // strands pull apart on cut, rejoin on repair
+  const topY = yc - 34, botY = yc + 34;
+  const gap = ease(proc.cut) * (1 - proc.repair) * 32; // strands pull apart on cut, rejoin on repair
 
   const out: string[] = ['<g>'];
 
@@ -257,7 +264,7 @@ function drawTargetLadder(dna: FActor, yc: number, proc: Proc): string {
 
     // base-pair rung
     if (proc.cut < 0.5 || proc.repair > 0.6) {
-      out.push(`<line x1="${colX + dx}" y1="${topY + 6}" x2="${colX + dx}" y2="${botY - 6}" stroke="#cbd5e1" stroke-width="1.5"/>`);
+      out.push(`<line x1="${colX + dx}" y1="${topY + 9}" x2="${colX + dx}" y2="${botY - 9}" stroke="#cbd5e1" stroke-width="2"/>`);
     }
 
     // top + bottom base tiles
@@ -270,12 +277,11 @@ function drawTargetLadder(dna: FActor, yc: number, proc: Proc): string {
     if (proc.hybridize > 0 && proc.cut < 0.05) {
       const colP = ease(clamp(proc.hybridize * (n + 1) - i)); // staggered zip
       if (colP > 0.02) {
-        const startY = topY - 80;
-        const ly = lerp(startY, topY - 20, colP);
+        const ly = lerp(topY - 96, topY - 26, colP);
         const gLetter = guideLetterFor(top);
-        out.push(`<text x="${colX}" y="${ly}" text-anchor="middle" font-size="15" font-weight="700" fill="#ef4444" opacity="${colP.toFixed(2)}">${gLetter}</text>`);
+        out.push(`<text x="${colX}" y="${ly}" text-anchor="middle" font-size="19" font-weight="800" fill="#ef4444" opacity="${colP.toFixed(2)}" font-family="ui-monospace, monospace">${gLetter}</text>`);
         if (colP > 0.95) {
-          out.push(`<line x1="${colX}" y1="${topY - 16}" x2="${colX}" y2="${topY - 8}" stroke="#22c55e" stroke-width="2"/>`);
+          out.push(`<line x1="${colX}" y1="${topY - 20}" x2="${colX}" y2="${topY - 11}" stroke="#22c55e" stroke-width="2.5"/>`);
         }
       }
     }
@@ -283,13 +289,13 @@ function drawTargetLadder(dna: FActor, yc: number, proc: Proc): string {
 
   // a soft "match confirmed" glow as the zip completes
   if (proc.hybridize > 0.9 && proc.cut < 0.05) {
-    out.push(`<rect x="${x0 - 6}" y="${topY - 22}" width="${winW + 12}" height="${botY - topY + 44}" rx="10" fill="none" stroke="#22c55e" stroke-width="2" opacity="0.5"/>`);
+    out.push(`<rect x="${x0 - 8}" y="${topY - 26}" width="${winW + 16}" height="${botY - topY + 52}" rx="12" fill="none" stroke="#22c55e" stroke-width="2.5" opacity="0.5"/>`);
   }
 
   // cut flash
   if (proc.cut > 0.02 && proc.repair < 0.2) {
     const fa = (1 - ease(proc.cut)) * 0.9 + 0.1;
-    out.push(`<line x1="${cx}" y1="${topY - 30}" x2="${cx}" y2="${botY + 30}" stroke="#ef4444" stroke-width="${(2 + 6 * (1 - proc.cut)).toFixed(1)}" opacity="${fa.toFixed(2)}"/>`);
+    out.push(`<line x1="${cx}" y1="${topY - 36}" x2="${cx}" y2="${botY + 36}" stroke="#ef4444" stroke-width="${(2 + 7 * (1 - proc.cut)).toFixed(1)}" opacity="${fa.toFixed(2)}"/>`);
   }
 
   out.push('</g>');
@@ -299,8 +305,8 @@ function drawTargetLadder(dna: FActor, yc: number, proc: Proc): string {
 function baseTile(x: number, y: number, letter: string, color: string): string {
   return (
     `<g>` +
-    `<rect x="${x - 11}" y="${y - 12}" width="22" height="24" rx="5" fill="#ffffff" stroke="${color}" stroke-width="1.5"/>` +
-    `<text x="${x}" y="${y + 6}" text-anchor="middle" font-size="15" font-weight="800" fill="${color}" font-family="ui-monospace, monospace">${letter}</text>` +
+    `<rect x="${x - 14}" y="${y - 15}" width="28" height="30" rx="6" fill="#ffffff" stroke="${color}" stroke-width="2"/>` +
+    `<text x="${x}" y="${y + 7}" text-anchor="middle" font-size="19" font-weight="800" fill="${color}" font-family="ui-monospace, monospace">${letter}</text>` +
     `</g>`
   );
 }
@@ -308,10 +314,9 @@ function baseTile(x: number, y: number, letter: string, color: string): string {
 const mutColor = (proc: Proc) => (proc.corrected ? '#16a34a' : '#dc2626');
 
 function mutMarker(x: number, y: number, proc: Proc): string {
-  if (proc.corrected) {
-    return `<text x="${x}" y="${y + 34}" text-anchor="middle" font-size="12" font-weight="700" fill="#16a34a">✓ corrected</text>`;
-  }
-  return `<text x="${x}" y="${y + 34}" text-anchor="middle" font-size="12" font-weight="700" fill="#dc2626">✗ mutation</text>`;
+  const txt = proc.corrected ? '✓ corrected' : '✗ mutation';
+  const col = proc.corrected ? '#16a34a' : '#dc2626';
+  return `<text x="${x}" y="${y + 42}" text-anchor="middle" font-size="15" font-weight="700" fill="${col}">${txt}</text>`;
 }
 
 // Display a plausible base-pairing partner for the guide (purely illustrative).
@@ -325,29 +330,40 @@ const guideLetterFor = (dnaBase: string) => (dnaBase === 'T' ? 'A' : dnaBase ===
 function drawProtein(a: FActor, st: ActorState, proc: Proc): string {
   if (st.opacity <= 0.01) return '';
   const cx = sx(st.x), cy = sy(st.y);
-  const rw = 38 * st.scale, rh = 30 * st.scale;
+  const rw = 50 * st.scale, rh = 34 * st.scale;
   const color = a.color ?? '#2563eb';
   // groove half-width at the bottom edge: wide when open, pinched when gripping
-  const groove = lerp(16, 3, ease(proc.grip)) * st.scale;
+  const groove = lerp(18, 3, ease(proc.grip)) * st.scale;
   const baseY = cy + rh;                 // bottom of the body, facing the DNA
   const glow = proc.grip > 0.05 && proc.grip < 1 ? ' filter="url(#af-glow)"' : '';
-  const o = (st.opacity * 0.85).toFixed(2);
+  const o = (st.opacity * 0.88).toFixed(2);
 
   // Body outline = ellipse with a V-groove cut into the bottom-center.
   const body =
     `M ${cx - rw},${cy} ` +
     `A ${rw} ${rh} 0 0 1 ${cx + rw},${cy} ` +
     `L ${cx + rw},${(cy + rh * 0.4).toFixed(1)} ` +
-    `Q ${cx + groove},${(baseY).toFixed(1)} ${cx + groove},${(baseY - 8).toFixed(1)} ` +  // right groove wall
-    `L ${cx + groove},${(baseY - 8).toFixed(1)} ` +
-    `Q ${cx},${(cy + rh * 0.2).toFixed(1)} ${cx - groove},${(baseY - 8).toFixed(1)} ` +     // groove apex
-    `Q ${cx - groove},${(baseY).toFixed(1)} ${cx - rw},${(cy + rh * 0.4).toFixed(1)} Z`;     // left groove wall
+    `Q ${cx + groove},${(baseY).toFixed(1)} ${cx + groove},${(baseY - 9).toFixed(1)} ` +
+    `L ${cx + groove},${(baseY - 9).toFixed(1)} ` +
+    `Q ${cx},${(cy + rh * 0.2).toFixed(1)} ${cx - groove},${(baseY - 9).toFixed(1)} ` +
+    `Q ${cx - groove},${(baseY).toFixed(1)} ${cx - rw},${(cy + rh * 0.4).toFixed(1)} Z`;
+
+  // Name tag: a pill sized to the text, so long names (e.g. "Cas9 nuclease")
+  // never get cropped by the round body. Sits in the protein's upper third.
+  const label = a.label ?? '';
+  const fs = 14 * st.scale;
+  const tagW = Math.max(rw * 1.2, label.length * fs * 0.6 + 18);
+  const tagY = cy - rh * 0.32;
+  const tag = label
+    ? `<rect x="${(cx - tagW / 2).toFixed(1)}" y="${(tagY - fs * 0.5 - 6).toFixed(1)}" width="${tagW.toFixed(1)}" height="${(fs + 12).toFixed(1)}" rx="${((fs + 12) / 2).toFixed(1)}" fill="#ffffff" opacity="0.95"/>` +
+      `<text x="${cx}" y="${(tagY + fs * 0.34).toFixed(1)}" text-anchor="middle" font-size="${fs.toFixed(1)}" font-weight="800" fill="${color}">${esc(label)}</text>`
+    : '';
 
   return (
     `<g data-actor="${a.id}" opacity="${o}"${glow}>` +
     `<path d="${body}" fill="${color}"/>` +
-    `<ellipse cx="${cx - rw * 0.35}" cy="${cy - rh * 0.35}" rx="${rw * 0.3}" ry="${rh * 0.3}" fill="#ffffff" opacity="0.2"/>` +
-    `<text x="${cx}" y="${cy - rh * 0.1}" text-anchor="middle" font-size="${13 * st.scale}" font-weight="800" fill="#ffffff">${esc(a.label ?? '')}</text>` +
+    `<ellipse cx="${cx - rw * 0.35}" cy="${cy - rh * 0.4}" rx="${rw * 0.28}" ry="${rh * 0.28}" fill="#ffffff" opacity="0.2"/>` +
+    tag +
     `</g>`
   );
 }
@@ -357,20 +373,20 @@ function drawStrand(a: FActor, st: ActorState, proc: Proc): string {
   if (st.opacity <= 0.01) return '';
   const cx = sx(st.x), cy = sy(st.y);
   const color = a.color ?? '#ef4444';
-  const w = 70 * (a.size ?? 1);
-  const path = `M ${cx - w / 2},${cy} C ${cx - w / 4},${cy - 14} ${cx - w / 8},${cy + 14} ${cx},${cy} ` +
-               `C ${cx + w / 8},${cy - 14} ${cx + w / 4},${cy + 14} ${cx + w / 2},${cy}`;
+  const w = 92 * (a.size ?? 1);
+  const path = `M ${cx - w / 2},${cy} C ${cx - w / 4},${cy - 18} ${cx - w / 8},${cy + 18} ${cx},${cy} ` +
+               `C ${cx + w / 8},${cy - 18} ${cx + w / 4},${cy + 18} ${cx + w / 2},${cy}`;
   const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
-  out.push(`<path d="${path}" stroke="${color}" stroke-width="3" fill="none" stroke-linecap="round"/>`);
+  out.push(`<path d="${path}" stroke="${color}" stroke-width="3.6" fill="none" stroke-linecap="round"/>`);
   // letters ride the strand until the zip takes over
   if (a.sequence && proc.hybridize < 0.05) {
     const seq = a.sequence.toUpperCase();
     for (let i = 0; i < seq.length; i++) {
       const lx = cx - w / 2 + (w / seq.length) * (i + 0.5);
-      out.push(`<text x="${lx.toFixed(1)}" y="${(cy - 12).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="700" fill="${color}" font-family="ui-monospace, monospace">${seq[i]}</text>`);
+      out.push(`<text x="${lx.toFixed(1)}" y="${(cy - 15).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" fill="${color}" font-family="ui-monospace, monospace">${seq[i]}</text>`);
     }
   }
-  if (a.label) out.push(`<text x="${cx}" y="${cy + 22}" text-anchor="middle" font-size="12" font-weight="700" fill="${color}">${esc(a.label)}</text>`);
+  if (a.label) out.push(`<text x="${cx}" y="${cy + 28}" text-anchor="middle" font-size="14" font-weight="700" fill="${color}">${esc(a.label)}</text>`);
   out.push('</g>');
   return out.join('');
 }
@@ -392,8 +408,8 @@ function drawLabel(a: FActor, st: ActorState): string {
   const cx = sx(st.x), cy = sy(st.y), c = a.color ?? '#7c3aed';
   return (
     `<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">` +
-    `<rect x="${cx - 42}" y="${cy - 14}" width="84" height="26" rx="13" fill="${c}" opacity="0.14"/>` +
-    `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="12" font-weight="800" fill="${c}">${esc(a.label ?? '')}</text>` +
+    `<rect x="${cx - 52}" y="${cy - 17}" width="104" height="32" rx="16" fill="${c}" opacity="0.16"/>` +
+    `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="15" font-weight="800" fill="${c}">${esc(a.label ?? '')}</text>` +
     `</g>`
   );
 }
@@ -441,23 +457,26 @@ export function renderFrameSVG(spec: FSpec, t: number, opts: FrameOpts = {}): st
   const cap = captionAt(spec, t);
   const tooltip = opts.hoverId ? renderTooltip(spec, opts.hoverId, t, cam) : '';
 
+  // In-SVG title/caption are only drawn for standalone use (e.g. snapshots);
+  // the player passes hideChrome and renders them as larger, crisp HTML.
+  const chrome = opts.hideChrome ? '' : (
+    `<text x="${VIEW_W / 2}" y="34" text-anchor="middle" font-size="26" font-weight="800" fill="#0f172a">${esc(spec.title)}</text>` +
+    (spec.subtitle ? `<text x="${VIEW_W / 2}" y="56" text-anchor="middle" font-size="15" fill="#64748b">${esc(spec.subtitle)}</text>` : '') +
+    (cap.text
+      ? `<text x="${VIEW_W / 2}" y="${VIEW_H - 18}" text-anchor="middle" font-size="22" font-weight="700" fill="#1e293b" opacity="${cap.alpha.toFixed(2)}">${esc(cap.text)}</text>`
+      : '')
+  );
+
   return (
     `<svg viewBox="0 0 ${VIEW_W} ${VIEW_H}" xmlns="http://www.w3.org/2000/svg" width="100%" font-family="Inter, system-ui, sans-serif">` +
     `<defs>` +
-    `<clipPath id="af-stage"><rect x="${STAGE_X}" y="${STAGE_Y}" width="${STAGE_W}" height="${STAGE_H}" rx="10"/></clipPath>` +
+    `<clipPath id="af-stage"><rect x="${STAGE_X}" y="${STAGE_Y}" width="${STAGE_W}" height="${STAGE_H}" rx="12"/></clipPath>` +
     `<filter id="af-glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` +
-    `<radialGradient id="af-bg" cx="50%" cy="40%" r="80%"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#eef4fb"/></radialGradient>` +
+    `<radialGradient id="af-bg" cx="50%" cy="38%" r="85%"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#eef4fb"/></radialGradient>` +
     `</defs>` +
     `<rect width="${VIEW_W}" height="${VIEW_H}" fill="url(#af-bg)"/>` +
-    // title (fixed)
-    `<text x="${VIEW_W / 2}" y="38" text-anchor="middle" font-size="24" font-weight="800" fill="#0f172a">${esc(spec.title)}</text>` +
-    (spec.subtitle ? `<text x="${VIEW_W / 2}" y="58" text-anchor="middle" font-size="13" fill="#64748b">${esc(spec.subtitle)}</text>` : '') +
-    // scene (camera-transformed, clipped to the stage)
     `<g clip-path="url(#af-stage)"><g transform="${cameraTransform(cam)}">${scene}</g></g>` +
-    // caption (fixed)
-    (cap.text
-      ? `<text x="${VIEW_W / 2}" y="${VIEW_H - 30}" text-anchor="middle" font-size="16" font-weight="600" fill="#1e293b" opacity="${cap.alpha.toFixed(2)}">${esc(cap.text)}</text>`
-      : '') +
+    chrome +
     tooltip +
     `</svg>`
   );
@@ -468,17 +487,17 @@ function renderTooltip(spec: FSpec, id: string, t: number, cam: { cx: number; cy
   if (!a) return '';
   const st = actorStateAt(spec, a, t);
   const p = screenOf(st.x, (a.at ?? [50, 50])[1], cam);
-  const w = 230, lines = wrap(a.description ?? '', 34);
-  const h = 30 + lines.length * 16;
+  const w = 268, lines = wrap(a.description ?? '', 32);
+  const h = 34 + lines.length * 18;
   const bx = clamp(p.x + 16, 8, VIEW_W - w - 8);
-  const by = clamp(p.y - h - 10, 64, VIEW_H - h - 50);
+  const by = clamp(p.y - h - 10, 36, VIEW_H - h - 12);
   const body = lines
-    .map((ln, i) => `<text x="${bx + 12}" y="${by + 40 + i * 16}" font-size="12" fill="#cbd5e1">${esc(ln)}</text>`)
+    .map((ln, i) => `<text x="${bx + 14}" y="${by + 46 + i * 18}" font-size="14" fill="#cbd5e1">${esc(ln)}</text>`)
     .join('');
   return (
     `<g>` +
-    `<rect x="${bx}" y="${by}" width="${w}" height="${h}" rx="9" fill="#0f172a" opacity="0.95"/>` +
-    `<text x="${bx + 12}" y="${by + 21}" font-size="13" font-weight="800" fill="#ffffff">${esc(a.label ?? a.id)}</text>` +
+    `<rect x="${bx}" y="${by}" width="${w}" height="${h}" rx="10" fill="#0f172a" opacity="0.95"/>` +
+    `<text x="${bx + 14}" y="${by + 24}" font-size="15" font-weight="800" fill="#ffffff">${esc(a.label ?? a.id)}</text>` +
     body +
     `</g>`
   );

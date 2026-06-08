@@ -24,7 +24,7 @@
     {
       "id": "cas9",
       "shape": "protein",
-      "label": "Cas9",
+      "label": "Cas9 nuclease",
       "description": "A protein that acts like molecular scissors. On its own it does nothing useful \u2014 it must be told where to cut by a guide RNA.",
       "color": "#2563eb",
       "at": [
@@ -201,25 +201,25 @@
         50.0,
         46.0
       ],
-      "zoom": 1.1,
+      "zoom": 1.08,
       "dur": 2.0
     },
     {
       "at": 8.0,
       "center": [
         50.0,
-        48.0
+        46.0
       ],
-      "zoom": 1.8,
+      "zoom": 1.55,
       "dur": 2.5
     },
     {
       "at": 13.0,
       "center": [
         50.0,
-        50.0
+        48.0
       ],
-      "zoom": 1.95,
+      "zoom": 1.65,
       "dur": 1.5
     },
     {

@@ -131,7 +131,7 @@ CRISPR_FALLBACK_SPEC = AnimationSpec(
             sequence="GACTTGCCAG", mutation_index=4,
         ),
         Actor(
-            id="cas9", shape="protein", label="Cas9",
+            id="cas9", shape="protein", label="Cas9 nuclease",
             description="A protein that acts like molecular scissors. On its own it does "
                         "nothing useful — it must be told where to cut by a guide RNA.",
             at=[14, 36], color="#2563eb", size=1.15,
@@ -152,9 +152,9 @@ CRISPR_FALLBACK_SPEC = AnimationSpec(
     ],
     camera=[
         CameraKey(at=0.0,  center=[50, 50], zoom=1.0),          # establish: whole genome
-        CameraKey(at=3.0,  center=[50, 46], zoom=1.1, dur=2.0),
-        CameraKey(at=8.0,  center=[50, 48], zoom=1.8, dur=2.5),  # zoom into the target
-        CameraKey(at=13.0, center=[50, 50], zoom=1.95, dur=1.5), # hold on the cut
+        CameraKey(at=3.0,  center=[50, 46], zoom=1.08, dur=2.0),
+        CameraKey(at=8.0,  center=[50, 46], zoom=1.55, dur=2.5), # zoom into the target
+        CameraKey(at=13.0, center=[50, 48], zoom=1.65, dur=1.5), # hold on the cut
         CameraKey(at=18.0, center=[50, 50], zoom=1.0, dur=2.5),  # pull back for the payoff
     ],
     events=[
