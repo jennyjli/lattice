@@ -19,6 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional
+from pathlib import Path
+import json
 import uvicorn
 
 from config import HOST, PORT, DEBUG, FRONTEND_URL, DEFAULT_USER_ID
@@ -26,7 +28,7 @@ from analyzer import ConceptAnalyzer, ConceptAnalysis
 from planner import VisualizationPlanner, VisualizationPlan
 from renderer import SVGRenderer
 from animation_director import AnimationDirector
-from animation_spec import CRISPR_FALLBACK_SPEC
+from animation_spec import CRISPR_FALLBACK_SPEC, AnimationSpec
 from web_researcher import WebResearcher
 from database import get_db, init_db
 from concept_studio import ConceptStudio
@@ -155,6 +157,36 @@ async def render_route(request: RenderRequest) -> dict:
         return {"svg": rendered}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Rendering failed: {e}")
+
+
+# ── Animation spec rendering (no LLM credits) ─────────────────────────────────
+#
+# render_spec plays a declarative AnimationSpec directly, bypassing Gemini. This
+# powers the Visualization Lab UI and lets the rendering module be exercised with
+# captured specs without spending API credits.
+
+SAMPLE_SPEC_DIR = Path(__file__).parent / "sample_specs"
+
+
+@app.post("/render/spec")
+async def render_spec_route(spec: AnimationSpec) -> dict:
+    """Render a declarative AnimationSpec into animated SVG. No LLM call."""
+    try:
+        return {"svg": renderer.render_spec(spec)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Spec rendering failed: {e}")
+
+
+@app.get("/sample-specs")
+async def sample_specs() -> dict:
+    """Return bundled example specs (captured Gemini output) for the lab UI."""
+    specs = []
+    for path in sorted(SAMPLE_SPEC_DIR.glob("*.json")):
+        try:
+            specs.append({"name": path.stem, "spec": json.loads(path.read_text())})
+        except (OSError, json.JSONDecodeError):
+            continue
+    return {"specs": specs}
 
 
 @app.post("/generate")

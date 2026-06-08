@@ -1,0 +1,154 @@
+{
+  "title": "How CRISPR-Cas9 Works: Gene Editing",
+  "duration": 15.5,
+  "actors": [
+    {
+      "id": "dna",
+      "shape": "double_helix",
+      "label": "Target DNA",
+      "color": "#3b82f6",
+      "at": [
+        50.0,
+        50.0
+      ],
+      "span": [
+        10.0,
+        90.0
+      ],
+      "size": 1.0
+    },
+    {
+      "id": "cas9",
+      "shape": "protein",
+      "label": "Cas9 Enzyme",
+      "color": "#2563eb",
+      "at": [
+        20.0,
+        35.0
+      ],
+      "size": 1.0
+    },
+    {
+      "id": "grna",
+      "shape": "strand",
+      "label": "guide RNA",
+      "color": "#ef4444",
+      "at": [
+        20.0,
+        25.0
+      ],
+      "size": 0.8
+    },
+    {
+      "id": "pam_label",
+      "shape": "label",
+      "label": "PAM",
+      "color": "#facc15",
+      "at": [
+        58.0,
+        42.0
+      ],
+      "size": 0.7
+    }
+  ],
+  "events": [
+    {
+      "at": 0.0,
+      "action": "appear",
+      "actor": "dna",
+      "dur": 1.0,
+      "caption": "Target DNA in the cell nucleus"
+    },
+    {
+      "at": 0.5,
+      "action": "appear",
+      "actor": "cas9",
+      "dur": 1.0,
+      "caption": "Cas9 enzyme complexed with guide RNA (gRNA)"
+    },
+    {
+      "at": 0.5,
+      "action": "appear",
+      "actor": "grna",
+      "dur": 1.0
+    },
+    {
+      "at": 2.0,
+      "action": "move",
+      "actor": "cas9",
+      "dur": 3.0,
+      "to": [
+        55.0,
+        35.0
+      ],
+      "caption": "The Cas9-gRNA complex scans the DNA sequence"
+    },
+    {
+      "at": 2.0,
+      "action": "move",
+      "actor": "grna",
+      "dur": 3.0,
+      "to": [
+        55.0,
+        25.0
+      ]
+    },
+    {
+      "at": 5.0,
+      "action": "appear",
+      "actor": "pam_label",
+      "dur": 0.5
+    },
+    {
+      "at": 5.0,
+      "action": "pulse",
+      "actor": "cas9",
+      "dur": 1.0,
+      "caption": "Protospacer Adjacent Motif (PAM) recognized adjacent to target"
+    },
+    {
+      "at": 6.5,
+      "action": "unwind",
+      "actor": "dna",
+      "dur": 2.0,
+      "at_x": 50.0,
+      "caption": "DNA unwinds, allowing guide RNA to hybridize with target"
+    },
+    {
+      "at": 9.0,
+      "action": "cut",
+      "actor": "dna",
+      "dur": 1.5,
+      "at_x": 50.0,
+      "caption": "Cas9 cleaves both DNA strands, creating a double-strand break"
+    },
+    {
+      "at": 11.0,
+      "action": "disappear",
+      "actor": "cas9",
+      "dur": 1.0,
+      "caption": "Cas9 dissociates from the DNA"
+    },
+    {
+      "at": 11.0,
+      "action": "disappear",
+      "actor": "grna",
+      "dur": 1.0
+    },
+    {
+      "at": 11.0,
+      "action": "disappear",
+      "actor": "pam_label",
+      "dur": 1.0
+    },
+    {
+      "at": 12.0,
+      "action": "repair",
+      "actor": "dna",
+      "dur": 3.0,
+      "at_x": 50.0,
+      "mode": "nhej",
+      "caption": "The cell's repair machinery often causes gene knockout (NHEJ)"
+    }
+  ]
+}

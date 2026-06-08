@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { latticeClient } from '@/api/client';
 import { ConceptExtractionResponse, ConceptExplanationResponse } from '@/types';
 import LearningCard from './LearningCard';
@@ -111,9 +112,14 @@ export default function ConceptStudio() {
       <div className="max-w-6xl mx-auto px-6 py-10">
 
         {/* ── Page header ── */}
-        <header className="mb-10">
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Lattice</h1>
-          <p className="text-gray-500 mt-1">A learning companion that remembers what you understand.</p>
+        <header className="mb-10 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Lattice</h1>
+            <p className="text-gray-500 mt-1">A learning companion that remembers what you understand.</p>
+          </div>
+          <Link href="/spec-lab" className="text-sm text-gray-500 hover:text-gray-800 whitespace-nowrap mt-1">
+            Visualization Lab →
+          </Link>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">

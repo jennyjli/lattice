@@ -1,0 +1,464 @@
+{
+  "title": "How DNA Replication Works",
+  "duration": 20.0,
+  "actors": [
+    {
+      "id": "dna",
+      "shape": "double_helix",
+      "label": "Parental DNA",
+      "color": "#3b82f6",
+      "at": [
+        50.0,
+        50.0
+      ],
+      "span": [
+        10.0,
+        90.0
+      ],
+      "size": 1.0
+    },
+    {
+      "id": "helicase",
+      "shape": "protein",
+      "label": "Helicase",
+      "color": "#f97316",
+      "at": [
+        20.0,
+        50.0
+      ],
+      "size": 1.0
+    },
+    {
+      "id": "primase",
+      "shape": "protein",
+      "label": "Primase",
+      "color": "#facc15",
+      "at": [
+        25.0,
+        40.0
+      ],
+      "size": 0.8
+    },
+    {
+      "id": "dna_pol_lead",
+      "shape": "protein",
+      "label": "DNA Pol (Leading)",
+      "color": "#22c55e",
+      "at": [
+        30.0,
+        30.0
+      ],
+      "size": 1.1
+    },
+    {
+      "id": "dna_pol_lag",
+      "shape": "protein",
+      "label": "DNA Pol (Lagging)",
+      "color": "#84cc16",
+      "at": [
+        40.0,
+        70.0
+      ],
+      "size": 1.1
+    },
+    {
+      "id": "ligase",
+      "shape": "protein",
+      "label": "Ligase",
+      "color": "#a855f7",
+      "at": [
+        70.0,
+        70.0
+      ],
+      "size": 0.9
+    },
+    {
+      "id": "rna_primer_lead",
+      "shape": "strand",
+      "label": "RNA Primer",
+      "color": "#ef4444",
+      "at": [
+        32.0,
+        45.0
+      ],
+      "size": 0.5
+    },
+    {
+      "id": "leading_strand",
+      "shape": "strand",
+      "label": "New Leading Strand",
+      "color": "#60a5fa",
+      "at": [
+        35.0,
+        45.0
+      ],
+      "size": 0.7
+    },
+    {
+      "id": "rna_primer_lag1",
+      "shape": "strand",
+      "label": "RNA Primer",
+      "color": "#ef4444",
+      "at": [
+        60.0,
+        55.0
+      ],
+      "size": 0.5
+    },
+    {
+      "id": "lagging_fragment_1",
+      "shape": "strand",
+      "label": "Okazaki Fragment",
+      "color": "#99f6e4",
+      "at": [
+        50.0,
+        55.0
+      ],
+      "size": 0.7
+    },
+    {
+      "id": "rna_primer_lag2",
+      "shape": "strand",
+      "label": "RNA Primer",
+      "color": "#ef4444",
+      "at": [
+        75.0,
+        55.0
+      ],
+      "size": 0.5
+    },
+    {
+      "id": "lagging_fragment_2",
+      "shape": "strand",
+      "label": "Okazaki Fragment",
+      "color": "#99f6e4",
+      "at": [
+        65.0,
+        55.0
+      ],
+      "size": 0.7
+    },
+    {
+      "id": "lagging_strand_final",
+      "shape": "strand",
+      "label": "New Lagging Strand",
+      "color": "#99f6e4",
+      "at": [
+        60.0,
+        55.0
+      ],
+      "size": 0.7
+    }
+  ],
+  "events": [
+    {
+      "at": 0.0,
+      "action": "appear",
+      "actor": "dna",
+      "dur": 1.0,
+      "caption": "Parental DNA double helix"
+    },
+    {
+      "at": 1.0,
+      "action": "appear",
+      "actor": "helicase",
+      "dur": 0.5
+    },
+    {
+      "at": 1.5,
+      "action": "move",
+      "actor": "helicase",
+      "dur": 1.5,
+      "to": [
+        30.0,
+        50.0
+      ],
+      "caption": "Helicase unwinds DNA, forming a replication fork"
+    },
+    {
+      "at": 2.5,
+      "action": "unwind",
+      "actor": "dna",
+      "dur": 1.0,
+      "at_x": 30.0
+    },
+    {
+      "at": 3.0,
+      "action": "appear",
+      "actor": "primase",
+      "dur": 0.5
+    },
+    {
+      "at": 3.5,
+      "action": "move",
+      "actor": "primase",
+      "dur": 0.5,
+      "to": [
+        32.0,
+        40.0
+      ],
+      "caption": "Primase synthesizes a short RNA primer"
+    },
+    {
+      "at": 4.0,
+      "action": "appear",
+      "actor": "rna_primer_lead",
+      "dur": 0.5
+    },
+    {
+      "at": 4.0,
+      "action": "pulse",
+      "actor": "rna_primer_lead",
+      "dur": 0.5
+    },
+    {
+      "at": 4.5,
+      "action": "appear",
+      "actor": "dna_pol_lead",
+      "dur": 0.5
+    },
+    {
+      "at": 5.0,
+      "action": "move",
+      "actor": "dna_pol_lead",
+      "dur": 0.5,
+      "to": [
+        35.0,
+        30.0
+      ],
+      "caption": "DNA Polymerase extends leading strand continuously"
+    },
+    {
+      "at": 5.0,
+      "action": "appear",
+      "actor": "leading_strand",
+      "dur": 0.5
+    },
+    {
+      "at": 5.5,
+      "action": "move",
+      "actor": "helicase",
+      "dur": 5.0,
+      "to": [
+        80.0,
+        50.0
+      ]
+    },
+    {
+      "at": 5.5,
+      "action": "unwind",
+      "actor": "dna",
+      "dur": 5.0,
+      "at_x": 80.0
+    },
+    {
+      "at": 5.5,
+      "action": "move",
+      "actor": "dna_pol_lead",
+      "dur": 5.0,
+      "to": [
+        80.0,
+        30.0
+      ]
+    },
+    {
+      "at": 5.5,
+      "action": "move",
+      "actor": "leading_strand",
+      "dur": 5.0,
+      "to": [
+        80.0,
+        45.0
+      ]
+    },
+    {
+      "at": 6.0,
+      "action": "move",
+      "actor": "primase",
+      "dur": 1.0,
+      "to": [
+        60.0,
+        60.0
+      ],
+      "caption": "Primase adds RNA primer for lagging strand synthesis"
+    },
+    {
+      "at": 7.0,
+      "action": "appear",
+      "actor": "rna_primer_lag1",
+      "dur": 0.5
+    },
+    {
+      "at": 7.0,
+      "action": "pulse",
+      "actor": "rna_primer_lag1",
+      "dur": 0.5
+    },
+    {
+      "at": 7.5,
+      "action": "appear",
+      "actor": "dna_pol_lag",
+      "dur": 0.5
+    },
+    {
+      "at": 8.0,
+      "action": "move",
+      "actor": "dna_pol_lag",
+      "dur": 1.0,
+      "to": [
+        50.0,
+        70.0
+      ],
+      "caption": "DNA Polymerase synthesizes an Okazaki fragment"
+    },
+    {
+      "at": 8.0,
+      "action": "appear",
+      "actor": "lagging_fragment_1",
+      "dur": 0.5
+    },
+    {
+      "at": 8.8,
+      "action": "move",
+      "actor": "primase",
+      "dur": 0.7,
+      "to": [
+        75.0,
+        60.0
+      ],
+      "caption": "Another RNA primer initiates a new fragment"
+    },
+    {
+      "at": 9.5,
+      "action": "appear",
+      "actor": "rna_primer_lag2",
+      "dur": 0.5
+    },
+    {
+      "at": 9.5,
+      "action": "pulse",
+      "actor": "rna_primer_lag2",
+      "dur": 0.5
+    },
+    {
+      "at": 10.0,
+      "action": "move",
+      "actor": "dna_pol_lag",
+      "dur": 1.0,
+      "to": [
+        65.0,
+        70.0
+      ],
+      "caption": "Elongation of the second Okazaki fragment"
+    },
+    {
+      "at": 10.0,
+      "action": "appear",
+      "actor": "lagging_fragment_2",
+      "dur": 0.5
+    },
+    {
+      "at": 11.0,
+      "action": "disappear",
+      "actor": "primase",
+      "dur": 0.5
+    },
+    {
+      "at": 11.2,
+      "action": "disappear",
+      "actor": "rna_primer_lead",
+      "dur": 0.3
+    },
+    {
+      "at": 11.4,
+      "action": "disappear",
+      "actor": "rna_primer_lag1",
+      "dur": 0.3
+    },
+    {
+      "at": 11.6,
+      "action": "disappear",
+      "actor": "rna_primer_lag2",
+      "dur": 0.3,
+      "caption": "RNA primers are removed and replaced with DNA"
+    },
+    {
+      "at": 12.0,
+      "action": "appear",
+      "actor": "ligase",
+      "dur": 0.5
+    },
+    {
+      "at": 12.5,
+      "action": "move",
+      "actor": "ligase",
+      "dur": 1.0,
+      "to": [
+        55.0,
+        70.0
+      ],
+      "caption": "Ligase seals the gaps between Okazaki fragments"
+    },
+    {
+      "at": 13.5,
+      "action": "disappear",
+      "actor": "lagging_fragment_1",
+      "dur": 0.5
+    },
+    {
+      "at": 13.5,
+      "action": "disappear",
+      "actor": "lagging_fragment_2",
+      "dur": 0.5
+    },
+    {
+      "at": 13.8,
+      "action": "appear",
+      "actor": "lagging_strand_final",
+      "dur": 0.5
+    },
+    {
+      "at": 14.5,
+      "action": "disappear",
+      "actor": "dna_pol_lead",
+      "dur": 0.5
+    },
+    {
+      "at": 14.5,
+      "action": "disappear",
+      "actor": "dna_pol_lag",
+      "dur": 0.5
+    },
+    {
+      "at": 15.0,
+      "action": "disappear",
+      "actor": "helicase",
+      "dur": 0.5
+    },
+    {
+      "at": 15.0,
+      "action": "disappear",
+      "actor": "ligase",
+      "dur": 0.5
+    },
+    {
+      "at": 16.0,
+      "action": "pulse",
+      "actor": "dna",
+      "dur": 1.5,
+      "caption": "Replication complete: Two identical DNA molecules"
+    },
+    {
+      "at": 16.0,
+      "action": "pulse",
+      "actor": "leading_strand",
+      "dur": 1.5
+    },
+    {
+      "at": 16.0,
+      "action": "pulse",
+      "actor": "lagging_strand_final",
+      "dur": 1.5
+    }
+  ]
+}

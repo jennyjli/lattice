@@ -5,6 +5,8 @@ import {
   ConceptExtractionResponse,
   ConceptExplanationResponse,
   AtlasResponse,
+  AnimationSpec,
+  SampleSpec,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -89,6 +91,20 @@ class LatticeClient {
   async health(): Promise<{ status: string }> {
     const r = await this.client.get<{ status: string }>('/health');
     return r.data;
+  }
+
+  // ── Visualization Lab (render specs directly, no LLM credits) ───────────────
+
+  /** Fetch bundled example animation specs (captured Gemini output). */
+  async getSampleSpecs(): Promise<SampleSpec[]> {
+    const r = await this.client.get<{ specs: SampleSpec[] }>('/sample-specs');
+    return r.data.specs;
+  }
+
+  /** Render an AnimationSpec into SVG without calling the LLM. */
+  async renderSpec(spec: AnimationSpec): Promise<string> {
+    const r = await this.client.post<{ svg: string }>('/render/spec', spec);
+    return r.data.svg;
   }
 }
 

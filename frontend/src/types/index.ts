@@ -185,3 +185,38 @@ export interface NoteContent {
   created_at: string;
   updated_at: string;
 }
+
+// ── Animation spec (LLM-directed visualization) ──────────────────────────────
+
+export interface AnimationActor {
+  id: string;
+  shape: string;
+  label?: string;
+  color?: string;
+  at?: [number, number];
+  span?: [number, number];
+  size?: number;
+}
+
+export interface AnimationEvent {
+  at: number;
+  action: string;
+  actor: string;
+  dur?: number;
+  to?: [number, number];
+  at_x?: number;
+  mode?: string;
+  caption?: string;
+}
+
+export interface AnimationSpec {
+  title: string;
+  duration: number;
+  actors: AnimationActor[];
+  events: AnimationEvent[];
+}
+
+export interface SampleSpec {
+  name: string;
+  spec: AnimationSpec;
+}
