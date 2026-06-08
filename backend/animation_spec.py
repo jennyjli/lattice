@@ -23,24 +23,37 @@ from typing import Literal, Optional
 
 # Reusable visual primitives a renderer knows how to draw.
 Shape = Literal[
+    # ── General-purpose (any domain) ──
+    "box",            # rectangle/block — components, sections, buildings, data
+    "cylinder",       # horizontal tube/pipe/tank (e.g. a tunnel section)
+    "fluid",          # translucent region with a wavy top — water, gas, liquid
+    "ground",         # solid terrain band with a surface line — seabed, soil, floor
+    "arrow",          # directional arrow — force, flow, motion (use `rotate`)
+    "gear",           # gear/machine — mechanical processes (spin with `rotate`)
+    "molecule",       # small circle / node / particle / generic entity
+    "label",          # free-floating text callout
+    # ── Molecular-biology specializations ──
     "double_helix",   # DNA/RNA duplex spanning `span` (can carry a `sequence`)
     "protein",        # enzyme/protein — drawn as a clamp that can grip & snap
     "strand",         # single nucleic-acid strand / guide RNA (can carry a `sequence`)
-    "molecule",       # small molecule / ligand / ion
     "membrane",       # lipid bilayer spanning `span`
-    "label",          # free-floating text
 ]
 
 # Verbs a renderer knows how to animate on the shared timeline.
 Action = Literal[
+    # ── General-purpose ──
     "appear",      # fade in
     "disappear",   # fade out
     "move",        # translate to `to`
     "pulse",       # glow / emphasis
+    "rotate",      # spin a gear / re-orient an arrow
+    "flow",        # animate flow (dashes) along a cylinder/pipe/arrow
+    "fill",        # progressively fill a fluid/box region (level 0 → 1)
+    "highlight",   # emphasize a region at `at_x` (optional `mode`/`color`)
+    # ── Molecular-biology specializations ──
     "grip",        # a protein clamps shut on `at_x` (open → closed)
     "unwind",      # splay a double_helix open at `at_x`
     "hybridize",   # zip a strand's letters onto the matching DNA bases at `at_x`
-    "highlight",   # emphasize a region/base at `at_x` (optional `mode`/`color`)
     "cut",         # double-strand break marker at `at_x`
     "repair",      # heal/edit marker at `at_x` (mode: nhej | hdr | correct)
 ]
@@ -54,8 +67,11 @@ class Actor(BaseModel):
     description: Optional[str] = None        # shown on hover ("what is this?")
     color: Optional[str] = None
     at: list[float] = [50.0, 50.0]           # [x, y] center, normalized 0–100
-    span: Optional[list[float]] = None       # [x0, x1] for helix/membrane, normalized
+    span: Optional[list[float]] = None       # [x0, x1] for helix/membrane/ground, normalized
     size: float = 1.0                        # relative scale multiplier
+    w: Optional[float] = None                # width in normalized units (box/cylinder/fluid)
+    h: Optional[float] = None                # height in normalized units (box/cylinder/fluid)
+    rotate: Optional[float] = None           # base orientation in degrees (arrow/gear)
     sequence: Optional[str] = None           # nucleotide letters, e.g. "GACTTGCCA"
     pam: Optional[str] = None                # PAM codon to call out, e.g. "TGG"
     mutation_index: Optional[int] = None     # index into `sequence` to flag as the mutation
@@ -196,5 +212,75 @@ CRISPR_FALLBACK_SPEC = AnimationSpec(
         Event(at=16.0, action="disappear", actor="pam", dur=1.0),
         Event(at=17.2, action="repair", actor="dna", at_x=50, mode="correct", dur=2.6,
               caption="The cell repairs the break — and the wrong letter is now corrected."),
+    ],
+)
+
+
+# ── Hand-authored showcase: a non-biology process (general primitives) ───────
+# Demonstrates that the same engine renders engineering/process concepts when
+# the spec uses the general vocabulary (fluid, ground, cylinder, box, arrow).
+
+TUNNEL_FALLBACK_SPEC = AnimationSpec(
+    title="Building an Underwater Tunnel",
+    subtitle="The immersed-tube method",
+    duration=19.0,
+    actors=[
+        Actor(id="sea", shape="fluid", label="Sea",
+              description="The body of water the tunnel must cross. Instead of boring "
+                          "through rock, the tunnel is laid on the seabed.",
+              at=[50, 34], w=94, h=44, color="#38bdf8"),
+        Actor(id="seabed", shape="ground", label="Seabed",
+              description="The floor of the sea — soft sediment a trench is dredged into.",
+              span=[3, 97], at=[50, 62], color="#a16207"),
+        Actor(id="trench", shape="box",
+              description="A channel dredged into the seabed to receive the tube sections.",
+              at=[50, 72], w=64, h=20, color="#7dd3fc"),
+        Actor(id="tube1", shape="cylinder", label="Tube section",
+              description="A giant prefabricated concrete tube, cast on land and sealed at "
+                          "both ends so it floats.",
+              at=[30, 26], w=30, h=13, color="#94a3b8"),
+        Actor(id="tube2", shape="cylinder", label="Tube section",
+              at=[70, 26], w=30, h=13, color="#94a3b8"),
+        Actor(id="dropL", shape="arrow",
+              description="The section is flooded so it sinks, then winched down precisely.",
+              at=[37, 48], w=8, color="#0369a1", rotate=90),
+        Actor(id="dropR", shape="arrow", at=[63, 48], w=8, color="#0369a1", rotate=90),
+        Actor(id="backfill", shape="box",
+              description="Rock and sand piled back over the tunnel to lock it in place.",
+              at=[50, 60], w=64, h=8, color="#a16207"),
+        Actor(id="car", shape="arrow", label="traffic",
+              description="With the water pumped out, road or rail runs through the tube.",
+              at=[26, 72], w=10, color="#f59e0b", rotate=0),
+    ],
+    camera=[
+        CameraKey(at=0.0,  center=[50, 44], zoom=1.0),
+        CameraKey(at=4.0,  center=[50, 58], zoom=1.25, dur=2.0),  # focus the seabed/trench
+        CameraKey(at=7.0,  center=[50, 60], zoom=1.35, dur=2.0),  # lowering
+        CameraKey(at=15.0, center=[50, 62], zoom=1.2, dur=2.0),   # drive-through
+    ],
+    events=[
+        Event(at=0.0, action="appear", actor="sea", dur=1.2,
+              caption="An immersed-tube tunnel isn't bored through rock — it's laid on the seabed."),
+        Event(at=0.6, action="appear", actor="seabed", dur=1.0),
+        Event(at=2.2, action="appear", actor="trench", dur=1.0,
+              caption="First, a trench is dredged across the seabed."),
+        Event(at=3.8, action="appear", actor="tube1", dur=1.0,
+              caption="Giant concrete tube sections are cast on land and floated out."),
+        Event(at=4.0, action="appear", actor="tube2", dur=1.0),
+        Event(at=5.2, action="appear", actor="dropL", dur=0.6,
+              caption="Each section is flooded so it sinks, and winched down into the trench."),
+        Event(at=5.2, action="appear", actor="dropR", dur=0.6),
+        Event(at=5.6, action="move", actor="tube1", to=[38, 72], dur=3.2),
+        Event(at=5.6, action="move", actor="tube2", to=[62, 72], dur=3.2),
+        Event(at=9.0, action="disappear", actor="dropL", dur=0.6),
+        Event(at=9.0, action="disappear", actor="dropR", dur=0.6),
+        Event(at=9.4, action="pulse", actor="tube1", dur=0.8,
+              caption="Divers connect the sections end to end, and the joints are sealed."),
+        Event(at=9.4, action="pulse", actor="tube2", dur=0.8),
+        Event(at=11.4, action="appear", actor="backfill", dur=1.2,
+              caption="The trench is backfilled to lock the tunnel in place."),
+        Event(at=13.6, action="appear", actor="car", dur=0.8,
+              caption="Finally the water is pumped out — now traffic drives under the sea."),
+        Event(at=14.4, action="move", actor="car", to=[74, 72], dur=3.4),
     ],
 )

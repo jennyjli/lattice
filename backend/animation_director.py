@@ -26,7 +26,7 @@ from config import (
     OPENAI_API_KEY,
     MODEL_NAME,
 )
-from animation_spec import AnimationSpec, CRISPR_FALLBACK_SPEC
+from animation_spec import AnimationSpec, CRISPR_FALLBACK_SPEC, TUNNEL_FALLBACK_SPEC
 from analyzer import ConceptAnalysis
 
 
@@ -36,33 +36,51 @@ _VOCAB = """\
 COORDINATE SPACE: normalized 0-100 on both axes, origin top-left. The DNA/main
 structure usually sits horizontally around y=50; proteins sit just above it.
 
-SHAPES (an actor's `shape`):
-- "double_helix": a nucleic-acid duplex. Set `span`: [x0, x1] (e.g. [6, 94]).
-  Optionally set `sequence` (e.g. "GACTTGCCAG") to show readable bases, and
-  `mutation_index` (int) to flag one base as a disease mutation.
-- "protein": an enzyme/protein with a DNA-binding groove (e.g. Cas9, a
-  polymerase). Set `at` ABOVE the DNA (e.g. y≈33), and a `description`.
+Pick the vocabulary that fits the DOMAIN. Use the general primitives for most
+concepts (engineering, physics, earth science, chemistry, computing); use the
+molecular-biology specializations only for molecular/genetic processes.
+
+GENERAL SHAPES (any domain):
+- "box": a rectangle/block — a component, section, building, container, data unit.
+  Set `at` and size with `w`,`h` (normalized units, e.g. w=24, h=12).
+- "cylinder": a horizontal tube/pipe/tank (e.g. a tunnel section, a pipeline).
+  Set `at`, `w`, `h`.
+- "fluid": a translucent region with a wavy top — water, gas, a liquid bath.
+  Set `span` (or `w`) and `h`.
+- "ground": a solid terrain band with a surface line — seabed, soil, a floor.
+  Set `span` and `at` (the surface y); it fills downward.
+- "arrow": a directional arrow — a force, a flow, a motion. Set `at`, `w` (length),
+  and `rotate` (degrees; 0 = right, 90 = down).
+- "gear": a gear/machine for mechanical processes. Set `at`, `w` (diameter).
+- "molecule": a small circle — a generic node, particle, or entity. Set `at`.
+- "label": a free-floating text callout. Set `at`, `label`.
+
+MOLECULAR-BIOLOGY SHAPES (only for molecular/genetic concepts):
+- "double_helix": a DNA/RNA duplex. Set `span`; optionally `sequence`
+  (e.g. "GACTTGCCAG") to show readable bases and `mutation_index` to flag one.
+- "protein": an enzyme with a binding groove (e.g. Cas9). Set `at` above the DNA.
 - "strand": a single strand / guide RNA. Set `at`; optionally `sequence`.
-- "molecule": a small molecule, ligand, or ion. Set `at`.
 - "membrane": a lipid bilayer. Set `span`.
-- "label": free-floating text callout (e.g. a PAM site). Set `at`, `label`.
 
 Give every important actor a one-sentence `description` — shown on hover so the
 learner can ask "what is this?".
 
-ACTIONS (a timeline event's `action`):
+GENERAL ACTIONS (any domain):
 - "appear" / "disappear": fade in / out.
-- "move": translate to `to`: [x, y] over `dur` seconds (use easing-friendly paths).
-- "pulse": glow/emphasis (use when something is recognized).
-- "unwind": splay a double_helix open at `at_x` (reveals the letters underneath).
+- "move": translate to `to`: [x, y] over `dur` seconds.
+- "pulse": glow/emphasis (use when two things connect or a step completes).
+- "rotate": spin a gear / re-orient an arrow.
+- "flow": animate flow (moving dashes) along a cylinder/pipe.
+- "fill": progressively fill a fluid/box region (level 0 → 1).
+- "highlight": emphasize a region at `at_x` (optional `mode`/`color`).
+
+MOLECULAR-BIOLOGY ACTIONS (only for molecular concepts):
+- "unwind": splay a double_helix open at `at_x`.
 - "hybridize": zip a strand's letters onto the matching DNA bases at `at_x` — use
-  this to SHOW why binding is specific (base-by-base matching). Put it on the strand.
-- "highlight": emphasize a base/region at `at_x`. Set `mode`: "mutation" to mark
-  the disease base.
-- "grip": a protein clamps shut on `at_x` (open → closed) just before cutting.
+  this to SHOW why binding is specific (base-by-base). Put it on the strand.
+- "grip": a protein clamps shut on `at_x` (open → closed) before cutting.
 - "cut": double-strand break at `at_x`.
-- "repair": heal/edit marker at `at_x`. Set `mode`: "correct" (fix the mutation),
-  "hdr" (precise edit), or "nhej" (knockout).
+- "repair": heal/edit at `at_x`. Set `mode`: "correct", "hdr", or "nhej".
 
 CAMERA (optional `camera`: list of keyframes): each has `at`, `center`: [x, y],
 `zoom` (1 = whole stage, ~2 = close-up), `dur`. Establish wide, ZOOM IN on the
@@ -132,25 +150,32 @@ class AnimationDirector:
 
     # ── Prompt ───────────────────────────────────────────────────────────────
 
+    # Domains for which the molecular-biology specializations are appropriate.
+    _BIO_HINTS = ("biolog", "genetic", "molecul", "cell", "biochem", "medic", "oncolog", "pharma")
+
     def _build_prompt(self, concept_name: str, analysis: ConceptAnalysis) -> str:
-        example = CRISPR_FALLBACK_SPEC.model_dump_json(exclude_none=True, indent=2)
+        is_bio = any(h in analysis.domain.lower() for h in self._BIO_HINTS)
+        example_spec = CRISPR_FALLBACK_SPEC if is_bio else TUNNEL_FALLBACK_SPEC
+        example = example_spec.model_dump_json(exclude_none=True, indent=2)
+        example_name = "CRISPR (molecular biology)" if is_bio else "an underwater tunnel (engineering, general primitives)"
         mechanisms = ", ".join(analysis.mechanisms[:5]) or "n/a"
         entities = ", ".join(analysis.entities[:8]) or "n/a"
 
-        return f"""You are an animation director for a science explainer. Produce a single \
+        return f"""You are an animation director for an explainer. Produce a single \
 continuous animation that shows how "{concept_name}" works as a PROCESS over time.
 
 Concept domain: {analysis.domain}
 Known mechanisms (steps): {mechanisms}
 Known entities: {entities}
 
-Represent each real molecular/physical actor with the closest shape primitive, then \
-choreograph the steps on one shared timeline so the viewer sees the process unfold \
-and COMPLETE. Prefer 3-6 actors and 6-12 events.
+Choose the shape primitives that best DEPICT each real object (so the picture itself \
+explains the concept), then choreograph the steps on one shared timeline so the viewer \
+sees the process unfold and COMPLETE. Prefer 3-6 actors and 6-12 events.
 
 {_VOCAB}
 
-Here is a complete, valid example for CRISPR (match this JSON shape exactly):
+Here is a complete, valid example for {example_name} — match this JSON shape exactly, \
+but use the vocabulary that fits "{concept_name}":
 
 {example}
 

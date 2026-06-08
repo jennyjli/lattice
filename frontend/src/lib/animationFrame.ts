@@ -22,6 +22,9 @@ export interface FActor {
   at?: [number, number];
   span?: [number, number];
   size?: number;
+  w?: number;
+  h?: number;
+  rotate?: number;
   sequence?: string;
   pam?: string;
   mutation_index?: number;
@@ -65,6 +68,9 @@ const SCREEN_CY = STAGE_Y + STAGE_H / 2;
 
 const sx = (nx: number) => STAGE_X + (nx / 100) * STAGE_W;
 const sy = (ny: number) => STAGE_Y + (ny / 100) * STAGE_H;
+const wpx = (w: number) => (w / 100) * STAGE_W;   // normalized width → px
+const hpx = (h: number) => (h / 100) * STAGE_H;   // normalized height → px
+const STAGE_BOTTOM = STAGE_Y + STAGE_H;
 
 // ── Math ─────────────────────────────────────────────────────────────────────
 
@@ -142,6 +148,24 @@ function actorStateAt(spec: FSpec, a: FActor, t: number): ActorState {
     }
   }
   return { opacity: clamp(opacity), x, y, scale };
+}
+
+// ── Generic effects (rotate / flow / fill) for an actor at time t ────────────
+
+interface ActorFx { rotate: number; flow: number; fill: number; }
+
+function actorFx(spec: FSpec, a: FActor, t: number): ActorFx {
+  let rotate = a.rotate ?? 0;
+  let flow = 0;
+  let fill = 0;
+  for (const e of spec.events.filter((ev) => ev.actor === a.id)) {
+    if (t < e.at) continue;
+    const dur = e.dur ?? 1.5;
+    if (e.action === 'rotate') rotate += (t - e.at) * 150;          // ~150°/s spin while/after active
+    else if (e.action === 'flow') flow = ((t - e.at) * 0.6) % 1;    // dash offset 0..1
+    else if (e.action === 'fill') fill = clamp((t - e.at) / dur);   // 0 → 1 level
+  }
+  return { rotate, flow, fill };
 }
 
 // ── Process state at the target site (the CRISPR mechanism) ──────────────────
@@ -429,9 +453,139 @@ function drawMembrane(a: FActor, st: ActorState): string {
   return heads.join('');
 }
 
+// ── General-purpose primitives (any domain) ──────────────────────────────────
+
+function labelBelow(a: FActor, cx: number, yBelow: number, color = '#475569'): string {
+  return a.label
+    ? `<text x="${cx.toFixed(1)}" y="${yBelow.toFixed(1)}" text-anchor="middle" font-size="14" font-weight="600" fill="${color}">${esc(a.label)}</text>`
+    : '';
+}
+
+function drawBox(a: FActor, st: ActorState, fx: ActorFx): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const w = wpx(a.w ?? 14) * st.scale, h = hpx(a.h ?? 10) * st.scale;
+  const c = a.color ?? '#64748b';
+  const x = cx - w / 2, y = cy - h / 2;
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${c}"/>`);
+  out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${(h * 0.32).toFixed(1)}" rx="4" fill="#ffffff" opacity="0.15"/>`);
+  if (fx.fill > 0) {  // optional fill level from the bottom
+    const fh = h * fx.fill;
+    out.push(`<rect x="${x.toFixed(1)}" y="${(y + h - fh).toFixed(1)}" width="${w.toFixed(1)}" height="${fh.toFixed(1)}" rx="4" fill="#ffffff" opacity="0.25"/>`);
+  }
+  if (a.label) out.push(`<text x="${cx.toFixed(1)}" y="${(cy + 5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">${esc(a.label)}</text>`);
+  out.push('</g>');
+  return out.join('');
+}
+
+function drawCylinder(a: FActor, st: ActorState, fx: ActorFx): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const w = wpx(a.w ?? 26) * st.scale, h = hpx(a.h ?? 12) * st.scale;
+  const c = a.color ?? '#94a3b8';
+  const x = cx - w / 2, y = cy - h / 2, ry = h / 2, rx = Math.min(h / 2, 10);
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  // capsule body + end caps for a 3D tube read
+  out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${ry.toFixed(1)}" fill="${c}"/>`);
+  out.push(`<ellipse cx="${(x + w).toFixed(1)}" cy="${cy.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="${c}"/>`);
+  out.push(`<ellipse cx="${x.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="#000000" opacity="0.18"/>`);
+  out.push(`<rect x="${(x + 4).toFixed(1)}" y="${(y + h * 0.18).toFixed(1)}" width="${(w - 8).toFixed(1)}" height="${(h * 0.18).toFixed(1)}" rx="3" fill="#ffffff" opacity="0.22"/>`);
+  if (fx.flow > 0) {  // moving dashes to show flow through the tube
+    const dash = 18, gap = 14, off = -fx.flow * (dash + gap);
+    out.push(`<line x1="${x.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(x + w).toFixed(1)}" y2="${cy.toFixed(1)}" stroke="#ffffff" stroke-width="2.5" opacity="0.6" stroke-dasharray="${dash} ${gap}" stroke-dashoffset="${off.toFixed(1)}"/>`);
+  }
+  out.push(labelBelow(a, cx, cy + h / 2 + 18));
+  out.push('</g>');
+  return out.join('');
+}
+
+function drawFluid(a: FActor, st: ActorState, t: number): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const w = a.span ? sx(a.span[1]) - sx(a.span[0]) : wpx(a.w ?? 90);
+  const h = hpx(a.h ?? 40);
+  const x0 = a.span ? sx(a.span[0]) : cx - w / 2;
+  const x1 = x0 + w, top = cy - h / 2, bot = cy + h / 2;
+  const c = a.color ?? '#38bdf8';
+  // wavy top edge (gently animated)
+  const amp = 5, k = 0.03;
+  const pts: string[] = [`M ${x0.toFixed(1)},${bot.toFixed(1)}`, `L ${x0.toFixed(1)},${top.toFixed(1)}`];
+  for (let x = x0; x <= x1; x += 14) {
+    const y = top + amp * Math.sin(k * (x - x0) + t * 1.6);
+    pts.push(`L ${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  pts.push(`L ${x1.toFixed(1)},${bot.toFixed(1)} Z`);
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  out.push(`<path d="${pts.join(' ')}" fill="${c}" opacity="0.32"/>`);
+  out.push(`<path d="${pts.join(' ')}" fill="none" stroke="${c}" stroke-width="2" opacity="0.5"/>`);
+  if (a.label) out.push(`<text x="${(x0 + 16).toFixed(1)}" y="${(top + 22).toFixed(1)}" font-size="14" font-weight="700" fill="${c}">${esc(a.label)}</text>`);
+  out.push('</g>');
+  return out.join('');
+}
+
+function drawGround(a: FActor, st: ActorState): string {
+  if (st.opacity <= 0.01) return '';
+  const span = a.span ?? [4, 96];
+  const x0 = sx(span[0]), x1 = sx(span[1]), surf = sy(st.y);
+  const c = a.color ?? '#a16207';
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  out.push(`<rect x="${x0.toFixed(1)}" y="${surf.toFixed(1)}" width="${(x1 - x0).toFixed(1)}" height="${(STAGE_BOTTOM - surf).toFixed(1)}" fill="${c}" opacity="0.85"/>`);
+  out.push(`<rect x="${x0.toFixed(1)}" y="${surf.toFixed(1)}" width="${(x1 - x0).toFixed(1)}" height="4" fill="#000000" opacity="0.18"/>`);
+  if (a.label) out.push(`<text x="${(x1 - 12).toFixed(1)}" y="${(surf + 22).toFixed(1)}" text-anchor="end" font-size="13" font-weight="700" fill="#ffffff" opacity="0.85">${esc(a.label)}</text>`);
+  out.push('</g>');
+  return out.join('');
+}
+
+function drawArrow(a: FActor, st: ActorState, fx: ActorFx): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const len = wpx(a.w ?? 8) * st.scale;
+  const c = a.color ?? '#334155';
+  const rot = fx.rotate; // degrees; 0 = pointing right, 90 = down
+  const half = len / 2, head = Math.min(12, len * 0.4);
+  const body =
+    `<line x1="${-half}" y1="0" x2="${half - head * 0.6}" y2="0" stroke="${c}" stroke-width="4" stroke-linecap="round"/>` +
+    `<polygon points="${half},0 ${half - head},${-head * 0.7} ${half - head},${head * 0.7}" fill="${c}"/>`;
+  const lbl = a.label ? `<text x="0" y="${(-head - 6)}" text-anchor="middle" font-size="12" font-weight="700" fill="${c}">${esc(a.label)}</text>` : '';
+  return (
+    `<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}" transform="translate(${cx.toFixed(1)} ${cy.toFixed(1)}) rotate(${rot.toFixed(1)})">` +
+    body + lbl + `</g>`
+  );
+}
+
+function drawGear(a: FActor, st: ActorState, fx: ActorFx): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const r = (a.w ? wpx(a.w) / 2 : 22) * st.scale;
+  const c = a.color ?? '#475569';
+  const teeth = 10;
+  const tooth: string[] = [];
+  for (let i = 0; i < teeth; i++) {
+    const ang = (i / teeth) * 2 * Math.PI;
+    const tx = Math.cos(ang) * (r + 6), ty = Math.sin(ang) * (r + 6);
+    tooth.push(`<rect x="${(tx - 3).toFixed(1)}" y="${(ty - 3).toFixed(1)}" width="6" height="6" fill="${c}" transform="rotate(${(ang * 180 / Math.PI).toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)})"/>`);
+  }
+  return (
+    `<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}" transform="translate(${cx.toFixed(1)} ${cy.toFixed(1)}) rotate(${fx.rotate.toFixed(1)})">` +
+    tooth.join('') +
+    `<circle cx="0" cy="0" r="${r.toFixed(1)}" fill="${c}"/>` +
+    `<circle cx="0" cy="0" r="${(r * 0.35).toFixed(1)}" fill="#ffffff" opacity="0.85"/>` +
+    (a.label ? `<text x="0" y="${(r + 18).toFixed(1)}" text-anchor="middle" font-size="12" font-weight="700" fill="${c}">${esc(a.label)}</text>` : '') +
+    `</g>`
+  );
+}
+
 function drawActor(spec: FSpec, a: FActor, t: number, proc: Proc): string {
   const st = actorStateAt(spec, a, t);
+  const fx = actorFx(spec, a, t);
   switch (a.shape) {
+    case 'box': return drawBox(a, st, fx);
+    case 'cylinder': return drawCylinder(a, st, fx);
+    case 'fluid': return drawFluid(a, st, t);
+    case 'ground': return drawGround(a, st);
+    case 'arrow': return drawArrow(a, st, fx);
+    case 'gear': return drawGear(a, st, fx);
     case 'double_helix': return drawDNA(a, st, proc);
     case 'protein': return drawProtein(a, st, proc);
     case 'strand': return drawStrand(a, st, proc);
@@ -447,10 +601,11 @@ export function renderFrameSVG(spec: FSpec, t: number, opts: FrameOpts = {}): st
   const cam = cameraAt(spec, t);
   const proc = procAt(spec, t);
 
-  // z-order: helix/membrane first, then strands/molecules, then proteins/labels on top.
-  const order = (a: FActor) =>
-    a.shape === 'double_helix' || a.shape === 'membrane' ? 0
-      : a.shape === 'protein' || a.shape === 'label' ? 2 : 1;
+  // z-order: backdrops (water/ground/helix) first, mid objects next, then
+  // proteins/labels/arrows/gears on top.
+  const BACK = new Set(['fluid', 'ground', 'double_helix', 'membrane']);
+  const FRONT = new Set(['protein', 'label', 'arrow', 'gear']);
+  const order = (a: FActor) => (BACK.has(a.shape) ? 0 : FRONT.has(a.shape) ? 2 : 1);
   const scene = [...spec.actors]
     .sort((x, y) => order(x) - order(y))
     .map((a) => drawActor(spec, a, t, proc))
