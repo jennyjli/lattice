@@ -6,9 +6,10 @@ Integrates with AI image generation when available.
 """
 
 from planner import VisualizationPlan
+from animation_spec import AnimationSpec, Actor, Event
 import json
 import math
-from typing import List
+from typing import List, Tuple
 
 
 class SVGRenderer:
@@ -992,3 +993,395 @@ class SVGRenderer:
         """
 
         return html
+
+    # ── Generic spec renderer (Tier 1: LLM-directed animation) ─────────────────
+    #
+    # render_spec plays *any* AnimationSpec — no per-concept code. Actors are
+    # drawn from a small shape vocabulary; events compile to CSS keyframes on a
+    # single shared timeline. See animation_spec.py / animation_director.py.
+
+    def render_spec(self, spec: AnimationSpec) -> str:
+        """Render a declarative AnimationSpec into a self-contained animated SVG."""
+        W, H = self.svg_width, self.svg_height
+        D = max(4.0, float(spec.duration))
+
+        actors_by_id = {a.id: a for a in spec.actors}
+
+        css_parts: List[str] = []
+        body_parts: List[str] = []
+        overlay_parts: List[str] = []
+
+        for actor in spec.actors:
+            actor_events = [e for e in spec.events if e.actor == actor.id]
+            css, group = self._compile_actor(actor, actor_events, D, W, H)
+            css_parts.append(css)
+            body_parts.append(group)
+
+        # Process overlays (unwind / cut / repair) sit above the actors. Within
+        # one actor they SEQUENCE — each stage is visible only until the next
+        # begins (so the R-loop, scissors and edit marker don't pile up); the
+        # final stage persists to the loop end as the result.
+        overlay_by_actor: dict = {}
+        for ev in spec.events:
+            if ev.action in ("unwind", "cut", "repair") and ev.actor in actors_by_id:
+                overlay_by_actor.setdefault(ev.actor, []).append(ev)
+        for actor_id, evs in overlay_by_actor.items():
+            evs.sort(key=lambda e: e.at)
+            target = actors_by_id[actor_id]
+            for i, ev in enumerate(evs):
+                end = evs[i + 1].at if i + 1 < len(evs) else D
+                css, svg = self._compile_overlay(ev, target, end, D, W, H)
+                css_parts.append(css)
+                overlay_parts.append(svg)
+
+        caption_css, caption_svg = self._compile_captions(spec.events, D, W, H)
+        css_parts.append(caption_css)
+
+        title = self._escape(spec.title)
+        styles = "\n".join(p for p in css_parts if p)
+
+        return (
+            f'<svg width="{W}" height="{H}" xmlns="http://www.w3.org/2000/svg" '
+            f'viewBox="0 0 {W} {H}">'
+            f'<defs>'
+            f'<style>{styles}</style>'
+            f'<filter id="spec-glow"><feGaussianBlur stdDeviation="2.5" result="b"/>'
+            f'<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+            f'</defs>'
+            f'<rect width="{W}" height="{H}" fill="#f8fafc" rx="6"/>'
+            f'<text x="{W//2}" y="28" text-anchor="middle" font-size="16" font-weight="700" '
+            f'fill="{self.colors["text"]}">{title}</text>'
+            f'{"".join(body_parts)}'
+            f'{"".join(overlay_parts)}'
+            f'{caption_svg}'
+            f'{self._spec_progress_bar(D, W, H)}'
+            f'</svg>'
+        )
+
+    # ── Coordinate mapping (normalized 0–100 → inner pixel box) ────────────────
+
+    def _nx(self, x: float, W: int) -> float:
+        return 40 + (max(0.0, min(100.0, x)) / 100.0) * (W - 80)
+
+    def _ny(self, y: float, H: int) -> float:
+        # Leave room for the title (top) and the caption track (bottom).
+        return 55 + (max(0.0, min(100.0, y)) / 100.0) * (H - 110)
+
+    def _pct(self, t: float, D: float) -> float:
+        return max(0.0, min(100.0, (t / D) * 100.0))
+
+    @staticmethod
+    def _escape(s: str) -> str:
+        return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    # ── Per-actor compilation ──────────────────────────────────────────────────
+
+    def _compile_actor(self, actor: Actor, events: List[Event],
+                       D: float, W: int, H: int) -> Tuple[str, str]:
+        """Return (css, svg_group) for one actor and its move/appear/disappear track."""
+        hx, hy = self._nx(actor.at[0], W), self._ny(actor.at[1], H)
+
+        # Tween track: opacity + translation over time.
+        motion = sorted(
+            [e for e in events if e.action in ("appear", "disappear", "move")],
+            key=lambda e: e.at,
+        )
+        has_appear = any(e.action == "appear" for e in motion)
+        op = 0.0 if has_appear else 1.0
+        dx = dy = 0.0
+
+        stops: List[Tuple[float, float, float, float]] = [(0.0, op, dx, dy)]
+        for e in motion:
+            t0 = min(e.at, D)
+            t1 = min(e.at + max(0.1, e.dur), D)
+            stops.append((t0, op, dx, dy))          # hold until the event starts
+            if e.action == "appear":
+                op = 1.0
+            elif e.action == "disappear":
+                op = 0.0
+            elif e.action == "move" and e.to:
+                dx = self._nx(e.to[0], W) - hx
+                dy = self._ny(e.to[1], H) - hy
+            stops.append((t1, op, dx, dy))
+        stops.append((D, op, dx, dy))               # hold final state to loop end
+
+        cls = f"act_{self._safe(actor.id)}"
+        css = self._keyframes_from_stops(cls, stops, D)
+
+        # Pulse overlays live *inside* the group so they inherit its translation.
+        pulses = ""
+        for i, e in enumerate(e for e in events if e.action == "pulse"):
+            pcls = f"{cls}_pulse{i}"
+            css += self._pulse_css(pcls, e, D)
+            pulses += (
+                f'<ellipse class="{pcls}" cx="{hx:.1f}" cy="{hy:.1f}" rx="48" ry="40" '
+                f'fill="none" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="5,3"/>'
+            )
+
+        shape_svg = self._draw_shape(actor, hx, hy)
+        group = f'<g class="{cls}">{shape_svg}{pulses}</g>'
+        return css, group
+
+    def _keyframes_from_stops(self, cls: str,
+                              stops: List[Tuple[float, float, float, float]],
+                              D: float) -> str:
+        # Collapse to one keyframe per percentage (last write wins), keep ascending.
+        frames: dict = {}
+        for (t, o, dx, dy) in stops:
+            p = round(self._pct(t, D), 2)
+            frames[p] = (o, dx, dy)
+        if 0.0 not in frames:
+            frames[0.0] = frames[min(frames)]
+        if 100.0 not in frames:
+            frames[100.0] = frames[max(frames)]
+
+        body = []
+        for p in sorted(frames):
+            o, dx, dy = frames[p]
+            body.append(f"{p:.2f}%{{opacity:{o:.2f};transform:translate({dx:.1f}px,{dy:.1f}px);}}")
+        return (
+            f".{cls}{{animation:kf_{cls} {D}s linear infinite;}}"
+            f"@keyframes kf_{cls}{{{''.join(body)}}}"
+        )
+
+    def _pulse_css(self, cls: str, e: Event, D: float) -> str:
+        s = self._pct(e.at, D)
+        mid = self._pct(e.at + e.dur * 0.5, D)
+        end = self._pct(e.at + e.dur, D)
+        return (
+            f".{cls}{{opacity:0;animation:kf_{cls} {D}s linear infinite;}}"
+            f"@keyframes kf_{cls}{{"
+            f"0%,{max(0.0, s - 0.1):.2f}%{{opacity:0;transform:scale(0.85);}}"
+            f"{mid:.2f}%{{opacity:0.9;transform:scale(1.05);}}"
+            f"{end:.2f}%,100%{{opacity:0;transform:scale(0.85);}}}}"
+        )
+
+    # ── Process overlays (unwind / cut / repair) ───────────────────────────────
+
+    def _compile_overlay(self, e: Event, target: Actor, end: float,
+                         D: float, W: int, H: int) -> Tuple[str, str]:
+        ax = self._nx(e.at_x if e.at_x is not None else target.at[0], W)
+        ay = self._ny(target.at[1], H)
+        cls = f"ovl_{self._safe(target.id)}_{e.action}_{int(e.at*10)}"
+
+        # Fade in at the event time; stay until the next overlay stage begins
+        # (end). The final stage has end == D, so it persists as the result.
+        s = self._pct(e.at, D)
+        fin = self._pct(e.at + max(0.1, e.dur), D)
+        out = self._pct(end, D)
+        persists = end >= D
+        if persists:
+            tail = f"{fin:.2f}%{{opacity:1;}}100%{{opacity:1;}}"
+        else:
+            hold = self._pct(max(e.at + e.dur, end - 0.4), D)
+            tail = (f"{fin:.2f}%{{opacity:1;}}{hold:.2f}%{{opacity:1;}}"
+                    f"{out:.2f}%,100%{{opacity:0;}}")
+        css = (
+            f".{cls}{{opacity:0;animation:kf_{cls} {D}s linear infinite;}}"
+            f"@keyframes kf_{cls}{{"
+            f"0%,{max(0.0, s - 0.1):.2f}%{{opacity:0;}}"
+            f"{tail}}}"
+        )
+
+        if e.action == "unwind":
+            svg = self._ovl_unwind(ax, ay)
+        elif e.action == "cut":
+            svg = self._ovl_cut(ax, ay)
+        else:  # repair
+            svg = self._ovl_repair(ax, ay, (e.mode or "generic").lower())
+
+        return css, f'<g class="{cls}">{svg}</g>'
+
+    def _ovl_unwind(self, cx: float, cy: float) -> str:
+        y1, y2 = cy - 22, cy + 22
+        return (
+            f'<path d="M {cx-46},{y1} C {cx},{y1-30} {cx},{y1-30} {cx+46},{y1}" '
+            f'stroke="#3b82f6" stroke-width="2.6" fill="none"/>'
+            f'<path d="M {cx-46},{y2} C {cx},{y2+30} {cx},{y2+30} {cx+46},{y2}" '
+            f'stroke="#06b6d4" stroke-width="2.6" fill="none"/>'
+            f'<rect x="{cx-34}" y="{cy-7}" width="68" height="9" rx="4" '
+            f'fill="#ef4444" opacity="0.7" filter="url(#spec-glow)"/>'
+            f'<text x="{cx}" y="{cy-36}" text-anchor="middle" font-size="9" '
+            f'font-weight="700" fill="#dc2626">R-loop</text>'
+        )
+
+    def _ovl_cut(self, cx: float, cy: float) -> str:
+        return (
+            f'<line x1="{cx}" y1="{cy-26}" x2="{cx}" y2="{cy+26}" '
+            f'stroke="#ef4444" stroke-width="2.5" stroke-dasharray="4,3"/>'
+            f'<circle cx="{cx}" cy="{cy}" r="15" fill="white" stroke="#ef4444" stroke-width="1.5"/>'
+            f'<text x="{cx}" y="{cy+6}" text-anchor="middle" font-size="16">✂</text>'
+        )
+
+    def _ovl_repair(self, cx: float, cy: float, mode: str) -> str:
+        if mode == "nhej":
+            color, txt, sub = "#f59e0b", "NHEJ", "knockout (indels)"
+            marker = (
+                f'<line x1="{cx-30}" y1="{cy}" x2="{cx-8}" y2="{cy}" stroke="#3b82f6" stroke-width="3"/>'
+                f'<line x1="{cx+8}" y1="{cy}" x2="{cx+30}" y2="{cy}" stroke="#3b82f6" stroke-width="3"/>'
+                f'<text x="{cx}" y="{cy-4}" text-anchor="middle" font-size="9" fill="#ef4444">⊘</text>'
+            )
+        elif mode == "hdr":
+            color, txt, sub = "#16a34a", "HDR", "precise edit"
+            marker = (
+                f'<line x1="{cx-30}" y1="{cy}" x2="{cx+30}" y2="{cy}" stroke="#3b82f6" stroke-width="3"/>'
+                f'<rect x="{cx-12}" y="{cy-6}" width="24" height="12" rx="3" fill="#16a34a"/>'
+                f'<text x="{cx}" y="{cy+4}" text-anchor="middle" font-size="7" '
+                f'font-weight="700" fill="white">edit</text>'
+            )
+        else:
+            color, txt, sub = "#16a34a", "Repaired", "break resolved"
+            marker = (
+                f'<line x1="{cx-30}" y1="{cy}" x2="{cx+30}" y2="{cy}" stroke="#3b82f6" stroke-width="3"/>'
+                f'<circle cx="{cx}" cy="{cy}" r="5" fill="#16a34a"/>'
+            )
+        return (
+            f'{marker}'
+            f'<text x="{cx}" y="{cy+30}" text-anchor="middle" font-size="10" '
+            f'font-weight="800" fill="{color}">✓ {txt}</text>'
+            f'<text x="{cx}" y="{cy+43}" text-anchor="middle" font-size="8" '
+            f'fill="{self.colors["text_light"]}">{sub}</text>'
+        )
+
+    # ── Caption track ──────────────────────────────────────────────────────────
+
+    def _compile_captions(self, events: List[Event],
+                          D: float, W: int, H: int) -> Tuple[str, str]:
+        caps = sorted(
+            [(e.at, e.caption) for e in events if e.caption],
+            key=lambda c: c[0],
+        )
+        if not caps:
+            return "", ""
+
+        css_parts, svg_parts = [], []
+        for i, (t, text) in enumerate(caps):
+            start = t
+            end = caps[i + 1][0] if i + 1 < len(caps) else D
+            cls = f"cap{i}"
+            sp = self._pct(start, D)
+            sp_in = self._pct(start + 0.3, D)
+            ep_out = self._pct(max(start + 0.3, end - 0.3), D)
+            ep = self._pct(end, D)
+            css_parts.append(
+                f".{cls}{{opacity:0;animation:kf_{cls} {D}s linear infinite;}}"
+                f"@keyframes kf_{cls}{{"
+                f"0%,{sp:.2f}%{{opacity:0;}}{sp_in:.2f}%{{opacity:1;}}"
+                f"{ep_out:.2f}%{{opacity:1;}}{ep:.2f}%,100%{{opacity:0;}}}}"
+            )
+            svg_parts.append(
+                f'<text class="{cls}" x="{W//2}" y="{H-22}" text-anchor="middle" '
+                f'font-size="12" font-weight="600" fill="{self.colors["text_light"]}">'
+                f'{self._escape(text)}</text>'
+            )
+        return "\n".join(css_parts), "".join(svg_parts)
+
+    def _spec_progress_bar(self, D: float, W: int, H: int) -> str:
+        return (
+            f'<rect x="40" y="{H-8}" width="{W-80}" height="2" rx="1" '
+            f'fill="{self.colors["secondary"]}" opacity="0.15"/>'
+            f'<rect x="40" y="{H-8}" width="{W-80}" height="2" rx="1" '
+            f'fill="{self.colors["primary"]}" transform-origin="40px {H-8}px" '
+            f'style="animation:spec_prog {D}s linear infinite;"/>'
+            f'<style>@keyframes spec_prog{{0%{{transform:scaleX(0);}}100%{{transform:scaleX(1);}}}}</style>'
+        )
+
+    # ── Shape vocabulary ───────────────────────────────────────────────────────
+
+    def _draw_shape(self, actor: Actor, hx: float, hy: float) -> str:
+        shape = actor.shape
+        if shape == "double_helix":
+            return self._shape_helix(actor, hx, hy)
+        if shape == "protein":
+            return self._shape_protein(actor, hx, hy)
+        if shape == "strand":
+            return self._shape_strand(actor, hx, hy)
+        if shape == "molecule":
+            return self._shape_molecule(actor, hx, hy)
+        if shape == "membrane":
+            return self._shape_membrane(actor, hx, hy)
+        return self._shape_label(actor, hx, hy)
+
+    def _shape_helix(self, actor: Actor, hx: float, hy: float) -> str:
+        W = self.svg_width
+        span = actor.span or [10, 90]
+        x0, x1 = self._nx(span[0], W), self._nx(span[1], W)
+        y1, y2 = hy - 22, hy + 22
+        ladder = self._dna_ladder(int(x0), int(x1), int(y1), int(y2), amp=14, period=54)
+        label = ""
+        if actor.label:
+            label = (
+                f'<text x="{(x0+x1)/2:.0f}" y="{y2+34:.0f}" text-anchor="middle" '
+                f'font-size="10" font-weight="600" fill="#3b82f6">{self._escape(actor.label)}</text>'
+            )
+        return ladder + label
+
+    def _shape_protein(self, actor: Actor, hx: float, hy: float) -> str:
+        c = actor.color or "#2563eb"
+        s = actor.size or 1.0
+        # Two overlapping lobes + a binding cleft → a bilobed silhouette, not a circle.
+        lobe_dx, rx, ry = 19 * s, 24 * s, 30 * s
+        return (
+            f'<ellipse cx="{hx-lobe_dx:.1f}" cy="{hy-4:.1f}" rx="{rx:.1f}" ry="{ry:.1f}" '
+            f'fill="{c}" opacity="0.9"/>'
+            f'<ellipse cx="{hx+lobe_dx:.1f}" cy="{hy-4:.1f}" rx="{rx:.1f}" ry="{ry:.1f}" '
+            f'fill="{c}" opacity="0.9"/>'
+            f'<ellipse cx="{hx:.1f}" cy="{hy-8:.1f}" rx="{rx*0.7:.1f}" ry="{ry*0.55:.1f}" '
+            f'fill="#ffffff" opacity="0.18"/>'
+            # cleft notch facing down (toward the DNA it clamps)
+            f'<path d="M {hx-12*s:.1f},{hy+22*s:.1f} L {hx:.1f},{hy+6*s:.1f} '
+            f'L {hx+12*s:.1f},{hy+22*s:.1f} Z" fill="#f8fafc"/>'
+            f'<text x="{hx:.1f}" y="{hy:.1f}" text-anchor="middle" font-size="{12*s:.0f}" '
+            f'font-weight="800" fill="white">{self._escape(actor.label or "")}</text>'
+        )
+
+    def _shape_strand(self, actor: Actor, hx: float, hy: float) -> str:
+        c = actor.color or "#ef4444"
+        return (
+            f'<path d="M {hx-34},{hy} C {hx-22},{hy-12} {hx-10},{hy+12} {hx+2},{hy} '
+            f'C {hx+14},{hy-12} {hx+26},{hy+12} {hx+38},{hy}" '
+            f'stroke="{c}" stroke-width="2.8" fill="none" stroke-linecap="round"/>'
+            + (
+                f'<text x="{hx:.1f}" y="{hy-16:.1f}" text-anchor="middle" font-size="9" '
+                f'font-weight="700" fill="{c}">{self._escape(actor.label)}</text>'
+                if actor.label else ""
+            )
+        )
+
+    def _shape_molecule(self, actor: Actor, hx: float, hy: float) -> str:
+        c = actor.color or "#10b981"
+        r = 12 * (actor.size or 1.0)
+        return (
+            f'<circle cx="{hx:.1f}" cy="{hy:.1f}" r="{r:.1f}" fill="{c}" opacity="0.85"/>'
+            f'<circle cx="{hx-r*0.5:.1f}" cy="{hy-r*0.5:.1f}" r="{r*0.35:.1f}" '
+            f'fill="#ffffff" opacity="0.4"/>'
+            + (
+                f'<text x="{hx:.1f}" y="{hy+r+12:.1f}" text-anchor="middle" font-size="9" '
+                f'fill="{self.colors["text_light"]}">{self._escape(actor.label)}</text>'
+                if actor.label else ""
+            )
+        )
+
+    def _shape_membrane(self, actor: Actor, hx: float, hy: float) -> str:
+        W = self.svg_width
+        span = actor.span or [10, 90]
+        x0, x1 = self._nx(span[0], W), self._nx(span[1], W)
+        heads = []
+        x = x0
+        while x <= x1:
+            heads.append(
+                f'<circle cx="{x:.0f}" cy="{hy-8:.0f}" r="5" fill="#f59e0b" opacity="0.8"/>'
+                f'<circle cx="{x:.0f}" cy="{hy+8:.0f}" r="5" fill="#f59e0b" opacity="0.8"/>'
+            )
+            x += 14
+        return "".join(heads)
+
+    def _shape_label(self, actor: Actor, hx: float, hy: float) -> str:
+        return (
+            f'<text x="{hx:.1f}" y="{hy:.1f}" text-anchor="middle" font-size="12" '
+            f'font-weight="600" fill="{self.colors["text"]}">{self._escape(actor.label or "")}</text>'
+        )
+
+    @staticmethod
+    def _safe(s: str) -> str:
+        return "".join(ch if ch.isalnum() else "_" for ch in s)
