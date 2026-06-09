@@ -204,3 +204,8 @@ export interface SampleSpec {
   name: string;
   spec: AnimationSpec;
 }
+
+export interface SampleScene {
+  name: string;
+  scene: SceneData;
+}

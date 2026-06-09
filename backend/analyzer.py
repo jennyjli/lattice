@@ -124,7 +124,9 @@ Important:
 - Be specific and concrete
 - Focus on visualization opportunities
 - Prioritize what's HARD to understand from text alone
-- Keep entities and mechanisms concise"""
+- Keep entities and mechanisms concise
+- For physical STRUCTURES (buildings, landmarks, monuments, bridges, vehicles), objects/artifacts, anatomy/organs, astronomical bodies, or anything best understood by its 3D FORM rather than a process: set "concept_type" to "spatial_structure", set "recommended_visualization" to ["3d"], and leave "mechanisms" EMPTY — do NOT invent construction or historical steps.
+- Only list "mechanisms" / recommend "animation" for genuine step-by-step PROCESSES (how something works or changes over time)."""
 
         try:
             response = self.client.chat.completions.create(
@@ -200,7 +202,8 @@ Important:
 - Focus on visualization opportunities
 - Prioritize what's HARD to understand from text alone
 - Keep entities and mechanisms concise
-- If the concept describes spatial or 3D structure, recommend [\"3d\"] or [\"spatial\"] when appropriate"""
+- For physical STRUCTURES (buildings, landmarks, monuments, bridges, vehicles), objects/artifacts, anatomy/organs, astronomical bodies, or anything best understood by its 3D FORM rather than a process: set \"concept_type\" to \"spatial_structure\", set \"recommended_visualization\" to [\"3d\"], and leave \"mechanisms\" EMPTY — do NOT invent steps.
+- Only list \"mechanisms\" / recommend \"animation\" for genuine step-by-step PROCESSES."""
 
         try:
             response = self.gemini_client.models.generate_content(

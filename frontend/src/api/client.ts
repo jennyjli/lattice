@@ -7,6 +7,7 @@ import {
   AtlasResponse,
   AnimationSpec,
   SampleSpec,
+  SampleScene,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -105,6 +106,12 @@ class LatticeClient {
   async renderSpec(spec: AnimationSpec): Promise<string> {
     const r = await this.client.post<{ svg: string }>('/render/spec', spec);
     return r.data.svg;
+  }
+
+  /** Fetch bundled particle scenes (built procedurally, no LLM) for the 3D viewer. */
+  async getSampleScenes(): Promise<SampleScene[]> {
+    const r = await this.client.get<{ scenes: SampleScene[] }>('/sample-scenes');
+    return r.data.scenes;
   }
 }
 

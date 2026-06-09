@@ -62,14 +62,38 @@ class VisualizationPlanner:
             scene_data=scene_data,
         )
 
+    # Concept-type hints used to route structural vs. process concepts.
+    _STRUCTURAL_HINTS = (
+        "spatial", "structure", "structural", "architect", "building", "landmark",
+        "monument", "anatom", "organ", "geograph", "astronom", "object", "artifact",
+        "vehicle", "place",
+    )
+    _PROCESS_HINTS = (
+        "process", "mechanism", "reaction", "cycle", "pathway", "temporal",
+        "workflow", "algorithm",
+    )
+
     def _choose_visualization_type(self, analysis: ConceptAnalysis) -> str:
         """Choose primary visualization type."""
         recs = set(analysis.recommended_visualization)
         has_mechanisms = bool(analysis.mechanisms)
+        ctype = (analysis.concept_type or "").lower()
+        domain = (analysis.domain or "").lower()
+
+        is_structural = (
+            any(h in ctype for h in self._STRUCTURAL_HINTS)
+            or any(h in domain for h in ("architect", "astronom", "anatom", "geograph"))
+        )
+        is_process = any(h in ctype for h in self._PROCESS_HINTS)
+
+        # Structural/spatial concepts (buildings, landmarks, anatomy, objects,
+        # astronomical bodies) → 3D model, even if the LLM also tagged steps.
+        # A genuine process that merely happens in 3D still animates.
+        if (is_structural or "3d" in recs or "spatial" in recs) and not is_process:
+            return "3d"
 
         # Animation + mechanisms beats 3d: "How does X work?" is a process
-        # question, not a structural one. Only go 3d when animation isn't
-        # recommended alongside it, or the concept has no sequential steps.
+        # question, not a structural one.
         if "animation" in recs and has_mechanisms:
             return "animation"
 

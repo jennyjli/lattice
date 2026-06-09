@@ -190,6 +190,53 @@ async def sample_specs() -> dict:
     return {"specs": specs}
 
 
+# Procedurally-built particle scenes (no LLM) for the Visualization Lab.
+def _cluster(cid, label, pos, count, radius, form, color, glow=1.0):
+    return {
+        "id": cid, "label": label, "position": pos, "particle_count": count,
+        "radius": radius, "form": form, "primary_color": color, "glow_intensity": glow,
+    }
+
+
+def _scene(domain, concept_type, notes, clusters):
+    return {
+        "render_mode": "particles",
+        "background": "#030303",
+        "clusters": clusters,
+        "camera": {"position": [0, 0, 520], "target": [0, 0, 0]},
+        "metadata": {"domain": domain, "concept_type": concept_type, "visual_notes": notes},
+    }
+
+
+_SAMPLE_SCENES = [
+    {"name": "colosseum", "scene": _scene(
+        "architecture", "spatial_structure", "Ancient stone amphitheatre, glowing arches", [
+            _cluster("ring", "Outer wall", [0, 20, 0], 42000, 100, "elongated", "#d4a373", 1.0),
+            _cluster("tiers", "Seating tiers", [0, -5, 0], 24000, 72, "crystalline", "#cb997e", 0.85),
+            _cluster("arena", "Arena floor", [0, -45, 0], 14000, 50, "planar", "#e9c46a", 0.8),
+        ])},
+    {"name": "caffeine_molecule", "scene": _scene(
+        "chemistry", "spatial_structure", "Caffeine molecule, atoms as glowing nodes", [
+            _cluster("ring", "Carbon rings", [0, 0, 0], 30000, 70, "crystalline", "#67e8f9", 1.0),
+            _cluster("n", "Nitrogen", [70, 30, 10], 12000, 34, "spherical", "#a78bfa", 0.9),
+            _cluster("o", "Oxygen", [-75, -25, -10], 12000, 32, "spherical", "#fb7185", 0.9),
+            _cluster("me", "Methyl groups", [40, -70, 20], 10000, 28, "spherical", "#e2e8f0", 0.7),
+        ])},
+    {"name": "spiral_galaxy", "scene": _scene(
+        "astronomy", "spatial_structure", "A spiral galaxy — billions of stars", [
+            _cluster("disc", "Galactic disc", [0, 0, 0], 60000, 115, "planar", "#8b9dff", 1.0),
+            _cluster("core", "Core", [0, 0, 0], 22000, 38, "spherical", "#fde68a", 1.0),
+            _cluster("halo", "Halo", [0, 0, 0], 16000, 150, "cloud", "#6366f1", 0.5),
+        ])},
+]
+
+
+@app.get("/sample-scenes")
+async def sample_scenes() -> dict:
+    """Return bundled particle scenes (built procedurally — no LLM) for the lab UI."""
+    return {"scenes": _SAMPLE_SCENES}
+
+
 @app.post("/generate")
 async def generate(request: GenerateRequest) -> dict:
     try:

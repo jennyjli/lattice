@@ -176,7 +176,7 @@ export default function ThreeDViewer({ sceneData }: Props) {
 
     const toDispose: Array<THREE.BufferGeometry | THREE.Material | THREE.Texture> = [];
     const particleGroup = new THREE.Group();
-    const clusterMeshes: Array<{ points: THREE.Points; label: string }> = [];
+    const clusterMeshes: Array<{ points: THREE.Points; label: string; phase: number; baseSize: number; baseOpacity: number }> = [];
 
     if (isParticleMode) {
       const glowTex = createGlowTexture();
@@ -204,20 +204,22 @@ export default function ThreeDViewer({ sceneData }: Props) {
         geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
         toDispose.push(geo);
 
+        const baseSize = 2.1;
+        const baseOpacity = 0.9;
         const mat = new THREE.PointsMaterial({
           map:          glowTex,
-          size:         2.8,
+          size:         baseSize,
           sizeAttenuation: true,
           vertexColors: true,
           blending:     THREE.AdditiveBlending,
           transparent:  true,
-          opacity:      0.82,
+          opacity:      baseOpacity,
           depthWrite:   false,
         });
         toDispose.push(mat);
 
         const mesh = new THREE.Points(geo, mat);
-        clusterMeshes.push({ points: mesh, label: cluster.label });
+        clusterMeshes.push({ points: mesh, label: cluster.label, phase: Math.random() * Math.PI * 2, baseSize, baseOpacity });
         particleGroup.add(mesh);
       });
 
@@ -284,9 +286,20 @@ export default function ThreeDViewer({ sceneData }: Props) {
     }
 
     let frameId: number;
+    const startMs = performance.now();
     const animate = () => {
       controls.update();
-      if (isParticleMode) particleGroup.rotation.y += 0.0004;
+      if (isParticleMode) {
+        const tm = (performance.now() - startMs) / 1000;
+        particleGroup.rotation.y += 0.0006;
+        // Per-cluster shimmer (twinkle) + gentle vertical drift for liveliness.
+        for (const cm of clusterMeshes) {
+          const mat = cm.points.material as THREE.PointsMaterial;
+          mat.opacity = cm.baseOpacity * (0.8 + 0.2 * Math.sin(tm * 1.4 + cm.phase));
+          mat.size = cm.baseSize * (1 + 0.18 * Math.sin(tm * 2.1 + cm.phase));
+          cm.points.position.y = Math.sin(tm * 0.5 + cm.phase) * 4;
+        }
+      }
       renderer.render(scene, camera);
       frameId = requestAnimationFrame(animate);
     };

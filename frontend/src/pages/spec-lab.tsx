@@ -1,56 +1,75 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { latticeClient } from '@/api/client';
-import { SampleSpec, AnimationSpec } from '@/types';
+import { AnimationSpec, SceneData } from '@/types';
 import AnimationPlayer from '@/components/AnimationPlayer';
+import ThreeDViewer from '@/components/ThreeDViewer';
+
+type LabItem =
+  | { name: string; kind: 'animation'; data: AnimationSpec }
+  | { name: string; kind: 'particles'; data: SceneData };
 
 /**
- * Visualization Lab — play animation specs in the real <AnimationPlayer>,
- * bypassing the LLM (no Gemini credits). Pick a captured sample spec or paste
- * your own JSON, hit Render, and watch it animate (scrub + hover supported).
+ * Visualization Lab — render visualizations directly with no LLM call:
+ *   • animation specs play in the real <AnimationPlayer> (scrub + hover)
+ *   • particle scenes render in the real <ThreeDViewer> (drag + zoom)
+ * Pick a sample or paste your own JSON and hit Render.
  */
 export default function SpecLab() {
-  const [samples, setSamples]   = useState<SampleSpec[]>([]);
+  const [items, setItems]     = useState<LabItem[]>([]);
   const [selected, setSelected] = useState<string>('');
-  const [specJson, setSpecJson] = useState<string>('');
-  const [spec, setSpec]         = useState<AnimationSpec | null>(null);
-  const [error, setError]       = useState<string | null>(null);
+  const [json, setJson]       = useState<string>('');
+  const [active, setActive]   = useState<LabItem | null>(null);
+  const [error, setError]     = useState<string | null>(null);
 
-  // Load captured sample specs once.
+  // Load both animation specs and particle scenes once.
   useEffect(() => {
-    latticeClient
-      .getSampleSpecs()
-      .then((specs) => {
-        setSamples(specs);
-        if (specs.length) {
-          setSelected(specs[0].name);
-          setSpecJson(JSON.stringify(specs[0].spec, null, 2));
-          setSpec(specs[0].spec);
-        }
+    Promise.all([latticeClient.getSampleSpecs(), latticeClient.getSampleScenes()])
+      .then(([specs, scenes]) => {
+        const list: LabItem[] = [
+          ...specs.map((s) => ({ name: s.name, kind: 'animation' as const, data: s.spec })),
+          ...scenes.map((s) => ({ name: s.name, kind: 'particles' as const, data: s.scene })),
+        ];
+        setItems(list);
+        if (list.length) selectItem(list[0], list);
       })
-      .catch(() => setError('Could not load sample specs. Is the backend running?'));
+      .catch(() => setError('Could not load samples. Is the backend running?'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSelect = (name: string) => {
-    const s = samples.find((x) => x.name === name);
-    if (!s) return;
-    setSelected(name);
-    setSpecJson(JSON.stringify(s.spec, null, 2));
-    setSpec(s.spec);
+  const selectItem = (item: LabItem, list = items) => {
+    void list;
+    setSelected(item.name);
+    setJson(JSON.stringify(item.data, null, 2));
+    setActive(item);
     setError(null);
   };
 
-  // Render is local (the player is pure) — parse + validate the JSON only.
+  const handleSelect = (name: string) => {
+    const item = items.find((x) => x.name === name);
+    if (item) selectItem(item);
+  };
+
+  // Render is local (both renderers are client-side) — parse + validate the JSON.
   const handleRender = () => {
     setError(null);
+    if (!active) return;
     try {
-      const parsed = JSON.parse(specJson) as AnimationSpec;
-      if (!parsed.actors?.length) throw new Error('spec needs at least one actor');
-      setSpec(parsed);
+      const parsed = JSON.parse(json);
+      if (active.kind === 'animation') {
+        if (!parsed.actors?.length) throw new Error('spec needs at least one actor');
+        setActive({ name: selected, kind: 'animation', data: parsed });
+      } else {
+        if (!parsed.clusters?.length) throw new Error('scene needs at least one cluster');
+        setActive({ name: selected, kind: 'particles', data: parsed });
+      }
     } catch (e) {
       setError(e instanceof SyntaxError ? `Invalid JSON: ${e.message}` : (e as Error).message);
     }
   };
+
+  const animations = items.filter((i) => i.kind === 'animation');
+  const scenes = items.filter((i) => i.kind === 'particles');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -61,7 +80,7 @@ export default function SpecLab() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Visualization Lab</h1>
             <p className="text-gray-500 mt-1">
-              Render animation specs directly — no LLM call, no API credits.
+              Render any visualization directly — no LLM call, no API credits.
             </p>
           </div>
           <Link href="/" className="text-sm text-gray-500 hover:text-gray-800">
@@ -71,27 +90,32 @@ export default function SpecLab() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-          {/* ── Left: spec editor ── */}
+          {/* ── Left: JSON editor ── */}
           <section className="space-y-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-                Sample spec
+                Sample
               </label>
               <select
                 value={selected}
                 onChange={(e) => handleSelect(e.target.value)}
                 className="text-sm border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-brand-400"
               >
-                {samples.map((s) => (
-                  <option key={s.name} value={s.name}>{s.name}</option>
-                ))}
+                <optgroup label="Animations (2D)">
+                  {animations.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
+                </optgroup>
+                <optgroup label="Particle scenes (3D)">
+                  {scenes.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
+                </optgroup>
               </select>
-              <span className="text-[10px] text-gray-400">captured Gemini output</span>
+              <span className="text-[10px] text-gray-400">
+                {active?.kind === 'particles' ? 'particle scene' : 'animation spec'}
+              </span>
             </div>
 
             <textarea
-              value={specJson}
-              onChange={(e) => setSpecJson(e.target.value)}
+              value={json}
+              onChange={(e) => setJson(e.target.value)}
               spellCheck={false}
               rows={26}
               className="w-full font-mono text-xs text-gray-800 bg-white border border-gray-200 rounded-xl p-4 resize-none focus:outline-none focus:ring-1 focus:ring-brand-400"
@@ -113,17 +137,21 @@ export default function SpecLab() {
           {/* ── Right: rendered output ── */}
           <section>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
-              Rendered animation
+              Rendered output
             </p>
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 min-h-80 flex items-center justify-center">
-              {spec ? (
-                <AnimationPlayer key={selected} spec={spec} />
-              ) : (
+              {!active ? (
                 <p className="text-sm text-gray-300">Output will appear here</p>
+              ) : active.kind === 'animation' ? (
+                <AnimationPlayer key={selected} spec={active.data} />
+              ) : (
+                <div className="w-full">
+                  <ThreeDViewer key={selected} sceneData={active.data} />
+                </div>
               )}
             </div>
             <p className="text-[11px] text-gray-400 mt-2">
-              Edit the JSON on the left and hit Render to play any spec — no LLM call.
+              Edit the JSON and hit Render — animations scrub/hover, particle scenes drag/zoom. No LLM call.
             </p>
           </section>
         </div>
