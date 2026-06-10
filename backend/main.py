@@ -198,23 +198,25 @@ def _cluster(cid, label, pos, count, radius, form, color, glow=1.0):
     }
 
 
-def _scene(domain, concept_type, notes, clusters):
+def _scene(domain, concept_type, notes, clusters, camera=None):
     return {
         "render_mode": "particles",
         "background": "#030303",
         "clusters": clusters,
-        "camera": {"position": [0, 0, 520], "target": [0, 0, 0]},
+        "camera": camera or {"position": [0, 0, 520], "target": [0, 0, 0]},
         "metadata": {"domain": domain, "concept_type": concept_type, "visual_notes": notes},
     }
 
 
 _SAMPLE_SCENES = [
     {"name": "colosseum", "scene": _scene(
-        "architecture", "spatial_structure", "Ancient stone amphitheatre, glowing arches", [
-            _cluster("ring", "Outer wall", [0, 20, 0], 42000, 100, "elongated", "#d4a373", 1.0),
-            _cluster("tiers", "Seating tiers", [0, -5, 0], 24000, 72, "crystalline", "#cb997e", 0.85),
-            _cluster("arena", "Arena floor", [0, -45, 0], 14000, 50, "planar", "#e9c46a", 0.8),
-        ])},
+        "architecture", "spatial_structure", "Ancient stone amphitheatre — an oval tiered wall",
+        [
+            _cluster("wall", "Outer wall", [0, 12, 0], 44000, 100, "ring", "#d4a373", 1.0),
+            _cluster("tiers", "Seating tiers", [0, -4, 0], 26000, 74, "ring", "#cb997e", 0.85),
+            _cluster("arena", "Arena floor", [0, -34, 0], 12000, 46, "planar", "#e9c46a", 0.8),
+        ],
+        camera={"position": [0, 250, 430], "target": [0, -10, 0]})},
     {"name": "caffeine_molecule", "scene": _scene(
         "chemistry", "spatial_structure", "Caffeine molecule, atoms as glowing nodes", [
             _cluster("ring", "Carbon rings", [0, 0, 0], 30000, 70, "crystalline", "#67e8f9", 1.0),
@@ -223,11 +225,13 @@ _SAMPLE_SCENES = [
             _cluster("me", "Methyl groups", [40, -70, 20], 10000, 28, "spherical", "#e2e8f0", 0.7),
         ])},
     {"name": "spiral_galaxy", "scene": _scene(
-        "astronomy", "spatial_structure", "A spiral galaxy — billions of stars", [
-            _cluster("disc", "Galactic disc", [0, 0, 0], 60000, 115, "planar", "#8b9dff", 1.0),
-            _cluster("core", "Core", [0, 0, 0], 22000, 38, "spherical", "#fde68a", 1.0),
-            _cluster("halo", "Halo", [0, 0, 0], 16000, 150, "cloud", "#6366f1", 0.5),
-        ])},
+        "astronomy", "spatial_structure", "A spiral galaxy — arms of stars around a bright core",
+        [
+            _cluster("disc", "Spiral arms", [0, 0, 0], 60000, 120, "spiral", "#9db4ff", 1.0),
+            _cluster("core", "Core", [0, 0, 0], 18000, 26, "spherical", "#fde68a", 1.0),
+            _cluster("halo", "Halo", [0, 0, 0], 12000, 150, "cloud", "#4f46e5", 0.4),
+        ],
+        camera={"position": [0, 90, 500], "target": [0, 0, 0]})},
 ]
 
 

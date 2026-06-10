@@ -112,6 +112,48 @@ function samplePositions(count: number, radius: number, form: ParticleCluster['f
       }
       break;
     }
+    case 'spiral': {
+      // Face-on spiral galaxy: a central bulge + logarithmic spiral arms in the
+      // x–y plane (so it reads as a spiral, not an edge-on disc).
+      const arms = 2;
+      const twist = 6.0;
+      const bulge = Math.floor(count * 0.16);
+      for (let i = 0; i < count; i++) {
+        if (i < bulge) {
+          const theta = Math.random() * Math.PI * 2;
+          const phi   = Math.acos(2 * Math.random() - 1);
+          const cr    = radius * 0.16 * Math.cbrt(Math.random());
+          pos[i * 3]     = cr * Math.sin(phi) * Math.cos(theta);
+          pos[i * 3 + 1] = cr * Math.sin(phi) * Math.sin(theta);
+          pos[i * 3 + 2] = cr * Math.cos(phi) * 0.7;
+        } else {
+          const rr = Math.pow(Math.random(), 0.6);          // 0..1, denser toward center
+          const r  = radius * rr;
+          const armAngle = (i % arms) * (Math.PI * 2 / arms);
+          const scatter  = (Math.random() - 0.5) * (0.6 - 0.4 * rr); // tighter arms outward
+          const theta = armAngle + rr * twist + scatter;
+          pos[i * 3]     = r * Math.cos(theta);
+          pos[i * 3 + 1] = r * Math.sin(theta);
+          pos[i * 3 + 2] = (Math.random() - 0.5) * radius * 0.05 * (1 - rr * 0.5);
+        }
+      }
+      break;
+    }
+    case 'ring': {
+      // An oval, tiered wall standing on the x–z plane with height in y — reads
+      // as an amphitheatre / colosseum / stadium / torus.
+      const rz = radius * 0.74;          // oval footprint
+      const wallH = radius * 0.6;
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const band = 1 + (Math.random() - 0.5) * 0.16;       // wall thickness
+        const hy = Math.pow(Math.random(), 0.85) * wallH;    // up from the base, denser low
+        pos[i * 3]     = radius * band * Math.cos(a);
+        pos[i * 3 + 1] = hy - wallH * 0.5;
+        pos[i * 3 + 2] = rz * band * Math.sin(a);
+      }
+      break;
+    }
     default: { // cloud
       // Ellipsoidal with noise — slightly biased toward surface for a puffy look
       for (let i = 0; i < count; i++) {

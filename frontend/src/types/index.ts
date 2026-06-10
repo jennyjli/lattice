@@ -16,7 +16,7 @@ export interface ConceptAnalysis {
 export interface VisualProfile {
   primary_color: string;
   secondary_color: string;
-  form: 'spherical' | 'cloud' | 'branching' | 'helical' | 'planar' | 'crystalline' | 'elongated';
+  form: 'spherical' | 'cloud' | 'branching' | 'helical' | 'planar' | 'crystalline' | 'elongated' | 'spiral' | 'ring';
   visual_notes: string;
 }
 
@@ -38,7 +38,7 @@ export interface ParticleCluster {
   position: [number, number, number];
   particle_count: number;
   radius: number;
-  form: 'spherical' | 'cloud' | 'branching' | 'helical' | 'planar' | 'crystalline' | 'elongated';
+  form: 'spherical' | 'cloud' | 'branching' | 'helical' | 'planar' | 'crystalline' | 'elongated' | 'spiral' | 'ring';
   primary_color: string;
   glow_intensity?: number;
 }
