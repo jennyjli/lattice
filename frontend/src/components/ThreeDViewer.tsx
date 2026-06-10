@@ -155,39 +155,62 @@ function samplePositions(count: number, radius: number, form: ParticleCluster['f
       break;
     }
     case 'amphitheater': {
-      // A colosseum: a tall OVAL arcade wall (vertical pillars + horizontal
-      // cornices read as tiers of arches) wrapping an inner seating bowl that
-      // slopes down toward the arena.
-      const rz = radius * 0.78;          // oval (x longer than z)
-      const wallH = radius * 0.95;       // tall
-      const cols = 56;                   // arches around the ellipse
-      const stories = 4;                 // cornice levels → arcade tiers
+      // A colosseum: a SOLID oval stone wall with rounded-top arch openings
+      // carved out in tiers (a solid facade with holes, not a wire grid),
+      // wrapping an inner seating bowl that slopes down to the arena.
+      const rz = radius * 0.80;          // oval (x longer than z)
+      const wallH = radius * 0.74;
       const yb = -wallH * 0.5;
+      const cols = 16;                   // arches around the ellipse (chunky)
+      const levels = 3;                  // arcade stories (below the attic)
+      const atticTop = 0.82;             // top 18% is a solid attic
+      const opening = 0.62;              // arch opening as a fraction of a column slot
+      const cornice = 0.20;              // solid band at the bottom of each story
+
+      // Is a point on the wall solid stone (vs. inside an arch opening)?
+      const isSolid = (a: number, yNorm: number): boolean => {
+        if (yNorm > atticTop) return true;                 // solid attic
+        const lf = yNorm / atticTop;                       // 0..1 across the stories
+        const v = lf * levels - Math.floor(lf * levels);   // 0..1 within a story
+        if (v < cornice) return true;                      // solid cornice/floor band
+        const vv = (v - cornice) / (1 - cornice);          // 0..1 up the arch zone
+        const ca = (a / (Math.PI * 2)) * cols;
+        const dcol = Math.abs((ca - Math.floor(ca)) - 0.5) * 2; // 0 center .. 1 pillar edge
+        let hw: number;                                    // arch half-width at this height
+        if (vv < 0.58) hw = opening;                       // straight jambs
+        else { const tt = (vv - 0.58) / 0.42; hw = vv >= 1 ? 0 : opening * Math.sqrt(Math.max(0, 1 - tt * tt)); }
+        return !(dcol < hw && vv < 0.98);                  // inside the rounded opening → void
+      };
+
       for (let i = 0; i < count; i++) {
-        if (Math.random() < 0.64) {
-          // OUTER WALL — arcade grid: ~62% on vertical pillars, rest on cornices
-          let a: number, yy: number;
-          if (Math.random() < 0.62) {
-            const colI = Math.round((Math.random() * cols));   // snap to a pillar
-            a  = (colI / cols) * Math.PI * 2 + (Math.random() - 0.5) * 0.016;
-            yy = yb + Math.random() * wallH;
-          } else {
-            const story = Math.floor(Math.random() * (stories + 1));  // snap to a cornice
-            a  = Math.random() * Math.PI * 2;
-            yy = yb + (story / stories) * wallH + (Math.random() - 0.5) * wallH * 0.03;
+        const role = Math.random();
+        if (role < 0.66) {
+          // SOLID WALL with arch voids — rejection-sample a stone point
+          let a = 0, yNorm = 0;
+          for (let t = 0; t < 10; t++) {
+            a = Math.random() * Math.PI * 2;
+            yNorm = Math.random();
+            if (isSolid(a, yNorm)) break;
           }
           const band = 1 + (Math.random() - 0.5) * 0.05;
           pos[i * 3]     = radius * band * Math.cos(a);
-          pos[i * 3 + 1] = yy;
+          pos[i * 3 + 1] = yb + yNorm * wallH;
           pos[i * 3 + 2] = rz * band * Math.sin(a);
-        } else {
-          // INNER SEATING BOWL — a cone of seats sloping down to the arena rim
+        } else if (role < 0.92) {
+          // INNER SEATING BOWL — seats sloping down toward the arena
           const a  = Math.random() * Math.PI * 2;
-          const rr = 0.44 + Math.pow(Math.random(), 0.8) * 0.5;       // 0.44 .. 0.94
-          const yy = yb + ((rr - 0.44) / 0.5) * (wallH * 0.62);       // outer seats higher
+          const rr = 0.46 + Math.pow(Math.random(), 0.8) * 0.48;     // 0.46 .. 0.94
+          const yy = ((rr - 0.46) / 0.48) * (wallH * 0.58);
           pos[i * 3]     = radius * rr * Math.cos(a);
-          pos[i * 3 + 1] = yy;
+          pos[i * 3 + 1] = yb + yy;
           pos[i * 3 + 2] = rz * rr * Math.sin(a);
+        } else {
+          // ARENA floor — flat oval at the base
+          const a  = Math.random() * Math.PI * 2;
+          const dr = Math.sqrt(Math.random()) * 0.42;
+          pos[i * 3]     = radius * dr * Math.cos(a);
+          pos[i * 3 + 1] = yb + (Math.random() - 0.5) * radius * 0.02;
+          pos[i * 3 + 2] = rz * dr * Math.sin(a);
         }
       }
       break;

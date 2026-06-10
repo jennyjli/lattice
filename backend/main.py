@@ -212,11 +212,10 @@ _SAMPLE_SCENES = [
     {"name": "colosseum", "scene": _scene(
         "architecture", "spatial_structure", "Ancient stone amphitheatre — tiers of arches around an arena",
         [
-            _cluster("arcade", "Arched walls & seating", [0, 0, 0], 64000, 100, "amphitheater", "#d4a373", 1.0),
-            _cluster("rim", "Top cornice", [0, 47, 0], 10000, 100, "ring", "#e7bc91", 0.9),
-            _cluster("arena", "Arena floor", [0, -46, 0], 9000, 42, "planar", "#a98467", 0.7),
+            _cluster("arcade", "Arched walls & seating", [0, 0, 0], 72000, 100, "amphitheater", "#d4a373", 1.0),
+            _cluster("arena", "Arena floor", [0, -36, 0], 7000, 40, "planar", "#a98467", 0.7),
         ],
-        camera={"position": [0, 210, 470], "target": [0, 0, 0]})},
+        camera={"position": [0, 170, 460], "target": [0, 0, 0]})},
     {"name": "caffeine_molecule", "scene": _scene(
         "chemistry", "spatial_structure", "Caffeine molecule, atoms as glowing nodes", [
             _cluster("ring", "Carbon rings", [0, 0, 0], 30000, 70, "crystalline", "#67e8f9", 1.0),
