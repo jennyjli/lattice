@@ -218,6 +218,7 @@ _SAMPLE_SCENES = [
                 "tierHeight": 42, "pierFrac": 0.46, "wallDepth": 18,
                 "atticHeight": 34, "arenaRatio": 0.56,
                 "color": "#caa472", "accent": "#9c7a52",
+                "ruinSpanDeg": 150, "caveaTiers": 6, "hypogeum": True,
             },
         },
         "camera": {"position": [0, 250, 560], "target": [0, 55, 0]},
