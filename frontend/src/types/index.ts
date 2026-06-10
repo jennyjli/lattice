@@ -58,7 +58,18 @@ export interface SceneRelationship {
   type: string;
 }
 
+export interface ParametricModel {
+  type: 'elliptical_arcade';
+  params: {
+    rx: number; rz: number; tiers: number; arches: number; tierHeight: number;
+    pierFrac: number; wallDepth: number; atticHeight: number; arenaRatio: number;
+    color: string; accent: string;
+  };
+}
+
 export interface SceneData {
+  // Precise parametric mesh model (real geometry)
+  model?: ParametricModel;
   // Particle rendering (new)
   render_mode?: 'particles';
   background?: string;

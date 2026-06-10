@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { SceneData, ParticleCluster, ReferenceImage } from '@/types';
 import { exportVisualizationAsHTML } from '@/utils/exportHTML';
+import { buildEllipticalArcade } from '@/lib/parametricModels';
 
 function createGlowTexture(): THREE.Texture {
   const size = 64;
@@ -240,7 +241,8 @@ export default function ThreeDViewer({ sceneData }: Props) {
   const rendererRef  = useRef<THREE.WebGLRenderer | null>(null);
   const tooltipRef   = useRef<HTMLDivElement | null>(null);
 
-  const isParticleMode = sceneData.render_mode === 'particles';
+  const isModel        = !!sceneData.model;
+  const isParticleMode = !isModel && sceneData.render_mode === 'particles';
   const visualNotes    = sceneData.metadata?.visual_notes;
   const referenceImage = sceneData.reference_image_url;
 
@@ -254,12 +256,13 @@ export default function ThreeDViewer({ sceneData }: Props) {
     const width  = container.clientWidth;
     const height = container.clientHeight || 480;
 
-    const bgHex = isParticleMode ? (sceneData.background ?? '#030303') : '#f8fafc';
+    const bgHex = isModel ? (sceneData.background ?? '#0e1726')
+      : isParticleMode ? (sceneData.background ?? '#030303') : '#f8fafc';
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(bgHex);
 
-    const camPos    = sceneData.camera?.position ?? (isParticleMode ? [0, 0, 520] : [0, 0, 300]) as [number, number, number];
-    const camTarget = sceneData.camera?.target   ?? [0, 0, 0] as [number, number, number];
+    const camPos    = sceneData.camera?.position ?? (isModel ? [0, 230, 520] : isParticleMode ? [0, 0, 520] : [0, 0, 300]) as [number, number, number];
+    const camTarget = sceneData.camera?.target   ?? (isModel ? [0, 50, 0] : [0, 0, 0]) as [number, number, number];
     const camera    = new THREE.PerspectiveCamera(50, width / height, 0.1, 5000);
     camera.position.set(camPos[0], camPos[1], camPos[2]);
     camera.lookAt(new THREE.Vector3(camTarget[0], camTarget[1], camTarget[2]));
@@ -280,8 +283,28 @@ export default function ThreeDViewer({ sceneData }: Props) {
     const toDispose: Array<THREE.BufferGeometry | THREE.Material | THREE.Texture> = [];
     const particleGroup = new THREE.Group();
     const clusterMeshes: Array<{ points: THREE.Points; label: string; phase: number; baseSize: number; baseOpacity: number }> = [];
+    let modelGroup: THREE.Group | null = null;
 
-    if (isParticleMode) {
+    if (isModel && sceneData.model) {
+      // Real geometry: lights + a parametric mesh model (precise, countable).
+      scene.add(new THREE.HemisphereLight(0xfff4e0, 0x223044, 0.95));
+      const sun = new THREE.DirectionalLight(0xffffff, 1.15);
+      sun.position.set(180, 320, 240);
+      scene.add(sun);
+      scene.add(new THREE.AmbientLight(0xffffff, 0.22));
+
+      if (sceneData.model.type === 'elliptical_arcade') {
+        modelGroup = buildEllipticalArcade(sceneData.model.params);
+        scene.add(modelGroup);
+        modelGroup.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (mesh.geometry) toDispose.push(mesh.geometry);
+          const m = mesh.material as THREE.Material | THREE.Material[] | undefined;
+          if (Array.isArray(m)) m.forEach((x) => toDispose.push(x));
+          else if (m) toDispose.push(m);
+        });
+      }
+    } else if (isParticleMode) {
       const glowTex = createGlowTexture();
       toDispose.push(glowTex);
 
@@ -403,6 +426,7 @@ export default function ThreeDViewer({ sceneData }: Props) {
           cm.points.position.y = Math.sin(tm * 0.5 + cm.phase) * 4;
         }
       }
+      if (modelGroup) modelGroup.rotation.y += 0.0016;  // slow showcase spin
       renderer.render(scene, camera);
       frameId = requestAnimationFrame(animate);
     };
@@ -426,13 +450,13 @@ export default function ThreeDViewer({ sceneData }: Props) {
       renderer.dispose();
       container.innerHTML = '';
     };
-  }, [sceneData, isParticleMode]);
+  }, [sceneData, isParticleMode, isModel]);
 
   return (
     <div className="rounded-xl border border-[#1a1a2e] bg-[#030303] overflow-hidden shadow-lg">
       <div className="px-4 py-3 border-b border-[#1a1a2e] bg-[#080818] flex items-center justify-between">
         <div>
-          <div className="text-sm font-semibold text-[#e2e8f0]">Particle Visualization</div>
+          <div className="text-sm font-semibold text-[#e2e8f0]">{isModel ? '3D Model' : 'Particle Visualization'}</div>
           <div className="text-xs text-[#94a3b8] mt-0.5">Drag to rotate · Scroll to zoom</div>
         </div>
         {isParticleMode && (

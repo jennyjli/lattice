@@ -209,13 +209,21 @@ def _scene(domain, concept_type, notes, clusters, camera=None):
 
 
 _SAMPLE_SCENES = [
-    {"name": "colosseum", "scene": _scene(
-        "architecture", "spatial_structure", "Ancient stone amphitheatre — tiers of arches around an arena",
-        [
-            _cluster("arcade", "Arched walls & seating", [0, 0, 0], 72000, 100, "amphitheater", "#d4a373", 1.0),
-            _cluster("arena", "Arena floor", [0, -36, 0], 7000, 40, "planar", "#a98467", 0.7),
-        ],
-        camera={"position": [0, 170, 460], "target": [0, 0, 0]})},
+    {"name": "colosseum", "scene": {
+        "background": "#0e1726",
+        "model": {
+            "type": "elliptical_arcade",
+            "params": {
+                "rx": 188, "rz": 156, "tiers": 3, "arches": 80,
+                "tierHeight": 42, "pierFrac": 0.46, "wallDepth": 18,
+                "atticHeight": 34, "arenaRatio": 0.56,
+                "color": "#caa472", "accent": "#9c7a52",
+            },
+        },
+        "camera": {"position": [0, 250, 560], "target": [0, 55, 0]},
+        "metadata": {"domain": "architecture", "concept_type": "spatial_structure",
+                     "visual_notes": "Colosseum — 80 arches per tier, 4 storeys, true ellipse"},
+    }},
     {"name": "caffeine_molecule", "scene": _scene(
         "chemistry", "spatial_structure", "Caffeine molecule, atoms as glowing nodes", [
             _cluster("ring", "Carbon rings", [0, 0, 0], 30000, 70, "crystalline", "#67e8f9", 1.0),
