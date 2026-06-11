@@ -72,16 +72,19 @@ export default function AnimationPlayer({ spec }: { spec: FSpec }) {
         {spec.subtitle && <p className="text-sm text-gray-500">{spec.subtitle}</p>}
       </div>
 
-      {/* The animation */}
+      {/* The animation — fixed aspect-ratio box so the SVG never reflows as the
+          camera zooms or content changes. */}
       <div
-        className="w-full cursor-default"
+        className="w-full relative cursor-default [&>svg]:absolute [&>svg]:inset-0 [&>svg]:h-full [&>svg]:w-full"
+        style={{ aspectRatio: '1000 / 470' }}
         onMouseMove={handleMove}
         onMouseLeave={() => setHoverId(null)}
         dangerouslySetInnerHTML={{ __html: renderFrameSVG(spec, t, { hoverId, hideChrome: true }) }}
       />
 
-      {/* Caption (large, fixed height so it doesn't shift the layout) */}
-      <div className="min-h-[3.25rem] flex items-center justify-center px-4 mt-1">
+      {/* Caption — FIXED height (room for up to 3 lines) so changing captions
+          never shift the layout. */}
+      <div className="h-[4.5rem] flex items-center justify-center px-4 mt-1 overflow-hidden">
         <p
           className="text-center text-[15px] sm:text-base font-medium text-slate-700 leading-snug transition-opacity duration-200"
           style={{ opacity: cap.alpha }}
