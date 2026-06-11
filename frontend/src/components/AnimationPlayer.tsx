@@ -65,7 +65,7 @@ export default function AnimationPlayer({ spec }: { spec: FSpec }) {
   const cap = captionAt(spec, t);
 
   return (
-    <div className="select-none rounded-xl border border-gray-100 bg-gradient-to-b from-white to-slate-50 p-4">
+    <div className="select-none w-full rounded-xl border border-gray-100 bg-gradient-to-b from-white to-slate-50 p-4">
       {/* Title (crisp HTML, not scaled with the SVG) */}
       <div className="text-center mb-1">
         <h3 className="text-xl font-extrabold text-gray-900 leading-tight">{spec.title}</h3>

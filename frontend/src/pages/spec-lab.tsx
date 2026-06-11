@@ -139,7 +139,7 @@ export default function SpecLab() {
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
               Rendered output
             </p>
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 min-h-80 flex items-center justify-center">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 min-h-80 flex flex-col justify-center">
               {!active ? (
                 <p className="text-sm text-gray-300">Output will appear here</p>
               ) : active.kind === 'animation' ? (
