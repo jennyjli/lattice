@@ -216,6 +216,46 @@ function samplePositions(count: number, radius: number, form: ParticleCluster['f
       }
       break;
     }
+    case 'lorenz': {
+      // The Lorenz attractor — particles trace one chaotic trajectory that
+      // folds into the iconic "butterfly". (z is mapped to vertical.)
+      const sigma = 10, rho = 28, beta = 8 / 3, dt = 0.005;
+      let x = 0.1, y = 0, z = 0;
+      for (let k = 0; k < 1500; k++) {        // skip the transient onto the attractor
+        const dx = sigma * (y - x), dy = x * (rho - z) - y, dz = x * y - beta * z;
+        x += dx * dt; y += dy * dt; z += dz * dt;
+      }
+      const s = radius / 26;
+      for (let i = 0; i < count; i++) {
+        const dx = sigma * (y - x), dy = x * (rho - z) - y, dz = x * y - beta * z;
+        x += dx * dt; y += dy * dt; z += dz * dt;
+        const j = (Math.random() - 0.5) * radius * 0.006;
+        pos[i * 3]     = x * s + j;
+        pos[i * 3 + 1] = (z - 25) * s + j;
+        pos[i * 3 + 2] = y * s + j;
+      }
+      break;
+    }
+    case 'aizawa': {
+      // The Aizawa attractor — a swirled spherical knot with an axial spike.
+      const a = 0.95, b = 0.7, c = 0.6, d = 3.5, e = 0.25, f = 0.1, dt = 0.01;
+      let x = 0.1, y = 0, z = 0;
+      const step = () => {
+        const dx = (z - b) * x - d * y;
+        const dy = d * x + (z - b) * y;
+        const dz = c + a * z - (z * z * z) / 3 - (x * x + y * y) * (1 + e * z) + f * z * x * x * x;
+        x += dx * dt; y += dy * dt; z += dz * dt;
+      };
+      for (let k = 0; k < 2000; k++) step();
+      const s = radius / 1.6;
+      for (let i = 0; i < count; i++) {
+        step();
+        pos[i * 3]     = x * s;
+        pos[i * 3 + 1] = (z - 0.9) * s;
+        pos[i * 3 + 2] = y * s;
+      }
+      break;
+    }
     default: { // cloud
       // Ellipsoidal with noise — slightly biased toward surface for a puffy look
       for (let i = 0; i < count; i++) {
@@ -314,15 +354,26 @@ export default function ThreeDViewer({ sceneData }: Props) {
         const colors  = new Float32Array(count * 3);
         const base    = new THREE.Color(cluster.primary_color);
         const [cx, cy, cz] = cluster.position;
+        // Attractors are one continuous trajectory — sweep the hue along it so
+        // the flow reads as a gradient of light.
+        const isAttractor = cluster.form === 'lorenz' || cluster.form === 'aizawa';
+        const grad = new THREE.Color();
 
         for (let i = 0; i < count; i++) {
           basePos[i * 3]     += cx;
           basePos[i * 3 + 1] += cy;
           basePos[i * 3 + 2] += cz;
-          const v = (Math.random() - 0.5) * 0.12;
-          colors[i * 3]     = Math.min(1, Math.max(0, base.r + v));
-          colors[i * 3 + 1] = Math.min(1, Math.max(0, base.g + v));
-          colors[i * 3 + 2] = Math.min(1, Math.max(0, base.b + v));
+          if (isAttractor) {
+            grad.copy(base).offsetHSL(0.6 * (i / count) - 0.3, 0, 0);
+            colors[i * 3]     = grad.r;
+            colors[i * 3 + 1] = grad.g;
+            colors[i * 3 + 2] = grad.b;
+          } else {
+            const v = (Math.random() - 0.5) * 0.12;
+            colors[i * 3]     = Math.min(1, Math.max(0, base.r + v));
+            colors[i * 3 + 1] = Math.min(1, Math.max(0, base.g + v));
+            colors[i * 3 + 2] = Math.min(1, Math.max(0, base.b + v));
+          }
         }
 
         const geo = new THREE.BufferGeometry();

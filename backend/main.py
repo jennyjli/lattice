@@ -240,6 +240,18 @@ _SAMPLE_SCENES = [
             _cluster("halo", "Halo", [0, 0, 0], 12000, 150, "cloud", "#4f46e5", 0.4),
         ],
         camera={"position": [0, 90, 500], "target": [0, 0, 0]})},
+    {"name": "lorenz_attractor", "scene": _scene(
+        "chaos_theory", "spatial_structure", "The Lorenz attractor — chaos folded into a butterfly",
+        [
+            _cluster("traj", "Trajectory", [0, 0, 0], 60000, 150, "lorenz", "#22d3ee", 1.0),
+        ],
+        camera={"position": [70, 30, 470], "target": [0, 0, 0]})},
+    {"name": "aizawa_attractor", "scene": _scene(
+        "chaos_theory", "spatial_structure", "The Aizawa attractor — a swirled knot of trajectory",
+        [
+            _cluster("traj", "Trajectory", [0, 0, 0], 60000, 150, "aizawa", "#a78bfa", 1.0),
+        ],
+        camera={"position": [0, 40, 430], "target": [0, 0, 0]})},
 ]
 
 
