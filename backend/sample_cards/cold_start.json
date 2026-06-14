@@ -1,0 +1,50 @@
+{
+  "setup": {
+    "query": "Transformer",
+    "known": [],
+    "encounter_count": 0
+  },
+  "recorded_with": "gemini:gemini-2.5-flash",
+  "card": {
+    "title": "Transformer",
+    "summary": "The Transformer is a powerful neural network architecture designed to process sequences of data, such as text, by understanding the relationships between all parts of the sequence simultaneously.",
+    "how_it_works": "Instead of processing information step-by-step, a Transformer uses a 'self-attention' mechanism to weigh the importance of different elements in a sequence to each other. This allows it to quickly grasp the context and connections, no matter how far apart elements are. It then aggregates these weighted relationships to generate an output sequence.",
+    "key_components": [
+      {
+        "name": "Self-Attention Mechanism",
+        "description": "Enables the model to understand the relationships between different parts of a sequence by weighing their importance to each other."
+      },
+      {
+        "name": "Positional Encoding",
+        "description": "Provides the model with information about the order of elements in the input sequence, which self-attention alone does not capture."
+      },
+      {
+        "name": "Encoder",
+        "description": "Processes the input sequence, transforming it into a rich contextual representation."
+      },
+      {
+        "name": "Decoder",
+        "description": "Uses the contextual representation from the encoder to generate the desired output sequence."
+      },
+      {
+        "name": "Feed-Forward Networks",
+        "description": "Applies a simple neural network independently to each position within the sequence, enhancing its understanding."
+      }
+    ],
+    "prerequisites": [
+      "Neural Networks",
+      "Vectors"
+    ],
+    "related": [
+      "BERT",
+      "GPT (Generative Pre-trained Transformer)"
+    ],
+    "use_cases": [
+      "Translating text from one language to another automatically.",
+      "Generating human-like text for creative writing or conversational AI.",
+      "Summarizing long documents or articles into concise overviews."
+    ],
+    "domain": "Artificial Intelligence (AI), Natural Language Processing (NLP)",
+    "analogy": null
+  }
+}

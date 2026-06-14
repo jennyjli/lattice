@@ -1,0 +1,56 @@
+{
+  "setup": {
+    "query": "Transformer",
+    "known": [
+      {
+        "name": "Attention mechanism",
+        "familiarity_score": 80
+      }
+    ],
+    "encounter_count": 0
+  },
+  "recorded_with": "gemini:gemini-2.5-flash",
+  "card": {
+    "title": "Transformer Neural Network",
+    "summary": "The Transformer is a neural network architecture, predominantly used in natural language processing, that revolutionized sequence-to-sequence tasks by exclusively relying on the attention mechanism to process data.",
+    "how_it_works": "Building on the Attention mechanism you already understand, the Transformer processes entire input sequences at once, rather than sequentially. It uses 'self-attention' to weigh the importance of different parts of the input relative to each other, allowing it to capture long-range dependencies efficiently. This enables the model to understand context without recurrence, making it highly parallelizable and effective.",
+    "key_components": [
+      {
+        "name": "Self-Attention",
+        "description": "Allows the model to weigh the importance of different words in an input sequence when encoding a specific word, capturing relationships between all elements."
+      },
+      {
+        "name": "Positional Encoding",
+        "description": "Adds information about the order of words in the sequence, as the attention mechanism itself does not inherently understand position."
+      },
+      {
+        "name": "Encoder Stack",
+        "description": "Processes the input sequence, using self-attention and feed-forward networks to create rich contextual representations for each token."
+      },
+      {
+        "name": "Decoder Stack",
+        "description": "Generates the output sequence step-by-step, using self-attention on its own output, and attention on the encoder's output, combined with feed-forward networks."
+      },
+      {
+        "name": "Feed-Forward Networks",
+        "description": "Applied independently to each position in the sequence, providing non-linear transformations after the attention layers."
+      }
+    ],
+    "prerequisites": [
+      "Attention mechanism"
+    ],
+    "related": [
+      "BERT",
+      "GPT-3",
+      "T5",
+      "Vision Transformer"
+    ],
+    "use_cases": [
+      "Translating text between different languages with high accuracy.",
+      "Generating coherent and contextually relevant human-like text.",
+      "Answering complex questions based on provided documents."
+    ],
+    "domain": "Natural Language Processing",
+    "analogy": "If the Attention mechanism is like highlighting the most important parts of a sentence, the Transformer is like an entire system built to read and understand books *only* by highlighting and cross-referencing these important parts, without ever having to read word-by-word."
+  }
+}

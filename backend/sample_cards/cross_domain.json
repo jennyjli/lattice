@@ -1,0 +1,62 @@
+{
+  "setup": {
+    "query": "Transformer",
+    "known": [
+      {
+        "name": "Assembly line",
+        "familiarity_score": 70
+      }
+    ],
+    "encounter_count": 0
+  },
+  "recorded_with": "gemini:gemini-2.5-flash",
+  "card": {
+    "title": "Transformer (Neural Network Architecture)",
+    "summary": "A Transformer is a powerful neural network architecture designed to process sequences of data, like words in a sentence, by understanding how different parts of the sequence relate to each other, regardless of their position.",
+    "how_it_works": "Building on the idea of an assembly line, a Transformer processes all parts of an input sequence simultaneously rather than one by one, allowing it to quickly grasp long-range dependencies. It uses a mechanism called \"attention\" to weigh the importance of different parts of the input relative to each other as it processes them, effectively allowing each word to 'look' at all other words in the sentence to understand its context. This parallel processing and contextual understanding enables highly effective sequence-to-sequence tasks.",
+    "key_components": [
+      {
+        "name": "Self-Attention Mechanism",
+        "description": "Allows each part of the input sequence (e.g., each word) to consider all other parts of the same sequence to understand its context."
+      },
+      {
+        "name": "Encoder",
+        "description": "Processes the input sequence, creating a rich representation of the information, much like the initial stages of an assembly line preparing raw materials."
+      },
+      {
+        "name": "Decoder",
+        "description": "Generates the output sequence, using the information from the encoder and its own attention to produce the desired result, like the final stages producing a finished product."
+      },
+      {
+        "name": "Positional Encoding",
+        "description": "Adds information about the order of items in the sequence, since the self-attention mechanism processes everything in parallel without inherent order."
+      },
+      {
+        "name": "Feed-Forward Networks",
+        "description": "Standard neural network layers applied independently to each position in the sequence, allowing the model to learn complex patterns after attention."
+      },
+      {
+        "name": "Multi-Head Attention",
+        "description": "Runs multiple attention mechanisms in parallel, allowing the model to focus on different aspects of the relationships between sequence elements simultaneously."
+      }
+    ],
+    "prerequisites": [
+      "Neural Network",
+      "Embeddings",
+      "Machine Learning Fundamentals"
+    ],
+    "related": [
+      "Large Language Models (LLMs)",
+      "Generative AI",
+      "BERT",
+      "GPT"
+    ],
+    "use_cases": [
+      "Translating text from one language to another automatically.",
+      "Generating coherent and contextually relevant text, like creative writing or summaries.",
+      "Answering questions based on provided documents by understanding the query and relevant text."
+    ],
+    "domain": "Artificial Intelligence / Natural Language Processing",
+    "analogy": "Like an assembly line, a Transformer processes input pieces, but instead of moving them one by one, it allows each piece to instantly 'look' at every other piece on the line to understand its context before any processing happens, making the whole line much smarter and faster at understanding relationships."
+  }
+}

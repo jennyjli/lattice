@@ -1,0 +1,67 @@
+{
+  "setup": {
+    "query": "Transformer",
+    "known": [
+      {
+        "name": "Attention mechanism",
+        "familiarity_score": 80
+      },
+      {
+        "name": "Neural networks",
+        "familiarity_score": 70
+      }
+    ],
+    "encounter_count": 5
+  },
+  "recorded_with": "gemini:gemini-2.5-flash",
+  "card": {
+    "title": "Transformer (Neural Network Architecture)",
+    "summary": "A Transformer is a neural network architecture designed for sequence-to-sequence tasks that exclusively relies on self-attention mechanisms to weigh the importance of different parts of the input sequence, completely abandoning recurrent or convolutional layers.",
+    "how_it_works": "Building on the core concept of the **Attention mechanism**, the Transformer processes entire sequences in parallel through stacked encoder and decoder blocks. Each block integrates multi-head self-attention to capture multi-faceted, long-range contextual relationships, followed by position-wise feed-forward **neural networks**, all stabilized by residual connections and layer normalization. Positional encodings are crucially injected to imbue the permutation-invariant attention with sequence order information, allowing the model to understand token positions without sequential processing.",
+    "key_components": [
+      {
+        "name": "Multi-Head Self-Attention",
+        "description": "This mechanism simultaneously computes multiple attention weightings for each token, allowing the model to focus on different relational aspects within the input sequence, vastly improving contextual understanding compared to single-head attention."
+      },
+      {
+        "name": "Positional Encoding",
+        "description": "These are vectors added to input embeddings that provide the model with crucial information about the absolute or relative position of each token, compensating for the permutation-invariance of attention."
+      },
+      {
+        "name": "Feed-Forward Networks (FFNs)",
+        "description": "Applied independently and identically to each position, these are simple two-layer fully connected **neural networks** that non-linearly transform the attention-weighted representations at each token position."
+      },
+      {
+        "name": "Residual Connections",
+        "description": "Also known as skip connections, these sum the input of a sub-layer with its output, mitigating the vanishing gradient problem and enabling the training of very deep Transformer models, much like in other deep **neural networks**."
+      },
+      {
+        "name": "Layer Normalization",
+        "description": "This technique normalizes the inputs across the features for each sample independently, which significantly stabilizes and speeds up training by ensuring consistent activation scales throughout the network."
+      },
+      {
+        "name": "Encoder-Decoder Architecture",
+        "description": "The standard structure comprises a stack of encoders that process the input sequence and a stack of decoders that generate the output sequence, with decoders utilizing cross-attention to attend to the encoder's final output."
+      }
+    ],
+    "prerequisites": [
+      "Attention mechanism",
+      "Neural networks",
+      "Backpropagation",
+      "Embeddings"
+    ],
+    "related": [
+      "BERT",
+      "GPT",
+      "Diffusion Models",
+      "Mixture of Experts (MoE)"
+    ],
+    "use_cases": [
+      "Translating natural language between different languages with high accuracy and fluency.",
+      "Generating coherent and contextually relevant text for chatbots, content creation, or code assistance.",
+      "Summarizing lengthy documents into concise overviews while preserving key information."
+    ],
+    "domain": "Natural Language Processing",
+    "analogy": "The Transformer is like an advanced **Attention mechanism** that has learned to parallel process entire documents at once, understanding the full context and relationships between all words simultaneously, rather than processing word-by-word like traditional recurrent **neural networks**."
+  }
+}
