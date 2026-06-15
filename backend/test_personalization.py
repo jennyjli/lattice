@@ -28,7 +28,7 @@ from sqlalchemy.orm import sessionmaker
 
 import concept_service as svc
 from concept_studio import ConceptStudio
-from models import Base, ConceptRelationship, UserConcept
+from models import Base, Concept, ConceptRelationship, UserConcept
 
 USER = "u1"
 
@@ -233,6 +233,33 @@ def test_h_depth_ladder():
         assert ctx["encounter_count"] == 5
 
 
+# ── I — Slug dedup: case/punctuation variants resolve to one row, no collision ─
+#   Regression for a 500 (UNIQUE constraint failed: concepts.slug) — the table's
+#   uniqueness is on slug, but dedup used to be by exact, case-sensitive name.
+
+def test_i_slug_dedup_no_collision():
+    with new_db() as db:
+        first = svc.create_or_update_concept(
+            db, name="How does CRISPR work?", summary="v1",
+            learning_card_data={}, domain_name="Molecular Biology",
+        )
+        # Same text, different case → same slug. Must update, not INSERT-collide.
+        second = svc.create_or_update_concept(
+            db, name="how does CRISPR work?", summary="v2",
+            learning_card_data={}, domain_name="Molecular Biology",
+        )
+        assert second.id == first.id, "case variant created a second row"
+        assert second.summary == "v2"
+        # Exactly one row for that slug.
+        count = db.query(Concept).filter_by(slug="how-does-crispr-work").count()
+        assert count == 1
+
+        # The _ensure_concept stub path (via relationships) dedups by slug too.
+        svc.upsert_relationships(db, second, prerequisites=["HOW DOES CRISPR WORK?"], related=[])
+        count = db.query(Concept).filter_by(slug="how-does-crispr-work").count()
+        assert count == 1, "relationship stub created a slug-colliding row"
+
+
 # ── Standalone runner (mirrors test_visualization.py's style) ──────────────────
 
 TESTS = [
@@ -244,6 +271,7 @@ TESTS = [
     ("F  low-familiarity-only → foundational",     test_f_low_familiarity_branch),
     ("G  knowledge gaps: <40, sorted, slug None",  test_g_knowledge_gaps),
     ("H  depth ladder scales with encounters",     test_h_depth_ladder),
+    ("I  slug dedup: case variants, no collision", test_i_slug_dedup_no_collision),
 ]
 
 

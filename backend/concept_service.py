@@ -55,11 +55,15 @@ def create_or_update_concept(
     learning_card_data: dict,
     domain_name: Optional[str] = None,
 ) -> Concept:
-    concept = get_concept_by_name(db, name)
+    # Dedup by slug, not exact name: the table's uniqueness is on slug, so two
+    # inputs differing only by case/punctuation ("CRISPR" vs "crispr?") map to
+    # the same slug and must resolve to the same row instead of colliding.
+    slug = slugify(name)
+    concept = get_concept_by_name(db, name) or get_concept_by_slug(db, slug)
     if not concept:
         concept = Concept(
             name=name,
-            slug=slugify(name),
+            slug=slug,
             summary=summary,
             learning_card_data=learning_card_data,
         )
@@ -88,9 +92,10 @@ def upsert_relationships(
     Skips duplicates silently.
     """
     def _ensure_concept(name: str) -> Optional[Concept]:
-        c = get_concept_by_name(db, name)
+        slug = slugify(name)
+        c = get_concept_by_name(db, name) or get_concept_by_slug(db, slug)
         if not c:
-            c = Concept(name=name, slug=slugify(name), summary="")
+            c = Concept(name=name, slug=slug, summary="")
             db.add(c)
             db.flush()
         return c
