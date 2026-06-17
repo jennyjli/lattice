@@ -324,8 +324,15 @@ async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)
             encounter_count=ctx["encounter_count"],
         )
 
-        # 4 — visualization pipeline
-        analysis = analyzer.analyze(request.text)
+        # 4 — visualization pipeline. Anchor the analyzer to the CARD's reading
+        # (title + domain), not the raw extraction: the card is the most considered
+        # interpretation and the one the user actually sees, so this keeps the
+        # visualization consistent with it and disambiguates acronyms like "MCP".
+        analysis = analyzer.analyze(
+            request.text,
+            concept_name=card.title or primary,
+            domain_hint=card.domain,
+        )
         research_data: dict = {}
         if "3d" in analysis.recommended_visualization or "spatial" in analysis.recommended_visualization:
             query = web_researcher.get_search_query(primary, analysis.entities)

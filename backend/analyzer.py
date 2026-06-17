@@ -74,12 +74,35 @@ class ConceptAnalyzer:
                     "Analysis will use demo analysis."
                 )
 
-    def analyze(self, text: str) -> ConceptAnalysis:
+    def _focus_line(self, concept_name: Optional[str], domain_hint: Optional[str]) -> str:
+        """Disambiguation preamble so ambiguous terms (e.g. "MCP") resolve to the
+        intended field instead of defaulting to a medical/biological reading."""
+        if not concept_name:
+            return ""
+        extra = f" (likely field: {domain_hint})" if domain_hint and domain_hint.lower() != "general" else ""
+        return (
+            f'The user wants to understand: "{concept_name}"{extra}. '
+            "Interpret it as the most common, general meaning across ALL fields "
+            "(technology, computer science, AI, software, economics, history, the "
+            "arts, and the natural sciences) — do NOT assume a medical or biological "
+            "meaning unless the term is clearly biological.\n\n"
+        )
+
+    def analyze(
+        self,
+        text: str,
+        concept_name: Optional[str] = None,
+        domain_hint: Optional[str] = None,
+    ) -> ConceptAnalysis:
         """
         Analyze note content using LLM.
 
         Args:
             text: Raw note content
+            concept_name: the primary concept already extracted upstream, used to
+                keep this analysis consistent with the learning card.
+            domain_hint: the domain the extractor inferred (e.g. "AI Systems"),
+                used to disambiguate acronyms toward the intended field.
 
         Returns:
             ConceptAnalysis with structure and recommendations
@@ -89,14 +112,14 @@ class ConceptAnalyzer:
             if not self.gemini_available:
                 print("⚠️  Gemini API key not configured or unavailable. Using demo analysis.")
                 return self._demo_analysis(text)
-            return self._analyze_with_gemini(text)
+            return self._analyze_with_gemini(text, concept_name, domain_hint)
 
         # Otherwise use OpenAI or fallback demo analysis.
         if not self.openai_available:
             print("⚠️  OpenAI API key not configured. Using demo analysis.")
             return self._demo_analysis(text)
 
-        prompt = f"""Analyze the following scientific/medical concept for educational explanation opportunities.
+        prompt = f"""{self._focus_line(concept_name, domain_hint)}Analyze the following concept for educational explanation opportunities.
 
 Text: "{text}"
 
@@ -105,7 +128,7 @@ Return a JSON object with this exact structure:
   "concept_type": "string (e.g., 'cellular_process', 'chemical_reaction', 'spatial_structure', 'temporal_process', 'mechanism')",
   "recommended_visualization": ["array of strings from: 'diagram', 'animation', 'comparison', 'timeline', 'interactive', '3d'"],
   "difficulty_reason": "string explaining why this concept is hard to visualize",
-  "domain": "string (e.g., 'oncology', 'chemistry', 'neuroscience', 'biology', 'physics')",
+  "domain": "string — the concept's actual field (e.g., 'AI systems', 'computer science', 'economics', 'history', 'chemistry', 'neuroscience', 'physics')",
   "entities": ["array of key entities/terms"],
   "relationships": [
     {{"source": "entity1", "target": "entity2", "type": "relationship_type"}},
@@ -134,7 +157,7 @@ Important:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an educational visualization expert. Analyze scientific concepts to identify visualization opportunities. Always respond with valid JSON.",
+                        "content": "You are an educational visualization expert. Analyze concepts from any field — technology, science, the humanities, economics, and more — to identify visualization opportunities. Always respond with valid JSON.",
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -172,8 +195,13 @@ Important:
             print(f"Error during analysis: {e}")
             return self._demo_analysis(text)
 
-    def _analyze_with_gemini(self, text: str) -> ConceptAnalysis:
-        prompt = f"""Analyze the following scientific/medical concept for educational explanation opportunities.
+    def _analyze_with_gemini(
+        self,
+        text: str,
+        concept_name: Optional[str] = None,
+        domain_hint: Optional[str] = None,
+    ) -> ConceptAnalysis:
+        prompt = f"""{self._focus_line(concept_name, domain_hint)}Analyze the following concept for educational explanation opportunities.
 
 Text: \"{text}\"
 
@@ -182,7 +210,7 @@ Return a JSON object with this exact structure:
   \"concept_type\": \"string (e.g., 'cellular_process', 'chemical_reaction', 'spatial_structure', 'temporal_process', 'mechanism')\",
   \"recommended_visualization\": [\"array of strings from: 'diagram', 'animation', 'comparison', 'timeline', 'interactive', '3d'\"],
   \"difficulty_reason\": \"string explaining why this concept is hard to visualize\",
-  \"domain\": \"string (e.g., 'oncology', 'chemistry', 'neuroscience', 'biology', 'physics')\",
+  \"domain\": \"string — the concept's actual field (e.g., 'AI systems', 'computer science', 'economics', 'history', 'chemistry', 'neuroscience', 'physics')\",
   \"entities\": [\"array of key entities/terms\"],
   \"relationships\": [
     {{\"source\": \"entity1\", \"target\": \"entity2\", \"type\": \"relationship_type\"}},
