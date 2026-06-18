@@ -133,7 +133,7 @@ class AnimationDirector:
         prompt = self._build_prompt(concept_name, analysis)
         try:
             raw = self._call_llm_with_retry(prompt)
-            data = self._parse_json(raw)
+            data = self._sanitize(self._parse_json(raw))
             spec = AnimationSpec.model_validate(data)
             if not spec.actors or not spec.events:
                 print("⚠️  AnimationDirector: spec had no actors/events; falling back")
@@ -141,7 +141,12 @@ class AnimationDirector:
             print(f"🎬 AnimationDirector: spec ok — {len(spec.actors)} actors, "
                   f"{len(spec.events)} events")
             return spec
-        except (ValidationError, ValueError, json.JSONDecodeError) as e:
+        except ValidationError as e:
+            # Log concise field locations (the full message is huge and unhelpful).
+            locs = "; ".join(f"{'.'.join(map(str, err['loc']))}={err['type']}" for err in e.errors()[:8])
+            print(f"⚠️  AnimationDirector: invalid spec [{locs}]; falling back")
+            return None
+        except (ValueError, json.JSONDecodeError) as e:
             print(f"⚠️  AnimationDirector: invalid spec ({e}); falling back")
             return None
         except Exception as e:
@@ -235,3 +240,60 @@ no commentary."""
         if match:
             text = match.group(0)
         return json.loads(text)
+
+    # The model occasionally types a numeric field wrong (a quoted number, null,
+    # or a single-element list) — and Pydantic would then reject the WHOLE spec,
+    # dropping an otherwise good, on-topic animation. Coerce those slips here so a
+    # few mistyped numbers don't cost the entire visualization.
+    @staticmethod
+    def _sanitize(data: dict) -> dict:
+        def num(v):
+            if isinstance(v, bool):
+                return None
+            if isinstance(v, (int, float)):
+                return float(v)
+            if isinstance(v, str):
+                try:
+                    return float(v.strip().rstrip("%"))
+                except ValueError:
+                    return None
+            if isinstance(v, list) and len(v) == 1:
+                return num(v[0])
+            return None
+
+        def fix_scalar(obj, key):
+            if isinstance(obj, dict) and key in obj:
+                n = num(obj[key])
+                if n is None:
+                    obj.pop(key)        # let the model's default apply
+                else:
+                    obj[key] = n
+
+        def fix_pair(obj, key):
+            if isinstance(obj, dict) and key in obj:
+                v = obj[key]
+                xs = [num(x) for x in v] if isinstance(v, list) else []
+                xs = [x for x in xs if x is not None]
+                if len(xs) >= 2:
+                    obj[key] = xs[:2]
+                else:
+                    obj.pop(key)        # fall back to default position
+
+        if not isinstance(data, dict):
+            return data
+        fix_scalar(data, "duration")
+        for a in data.get("actors") or []:
+            for k in ("size", "w", "h", "rotate"):
+                fix_scalar(a, k)
+            for k in ("at", "span"):
+                fix_pair(a, k)
+        for e in data.get("events") or []:
+            for k in ("at", "dur", "at_x"):
+                fix_scalar(e, k)
+            fix_pair(e, "to")
+            e.setdefault("at", 0.0)     # `at` is required — keep the event playable
+        for c in data.get("camera") or []:
+            for k in ("at", "zoom", "dur"):
+                fix_scalar(c, k)
+            fix_pair(c, "center")
+        return data
