@@ -87,6 +87,19 @@ CAMERA (optional `camera`: list of keyframes): each has `at`, `center`: [x, y],
 key mechanism (the binding/cut), then PULL BACK for the result. This is what
 makes it feel cinematic instead of like slides.
 
+LABELS & SIZING:
+- Keep every `label` SHORT — at most ~18 characters or 3 words (e.g. "Attention",
+  "Encoder", "Q · K · V"). Put the full explanation in `description`, not the label.
+- Size each box to its label: a box holding text needs at least w≈14, h≈7. Make
+  container/module boxes large (w≈30-45, h≈25-35) and place smaller parts inside.
+
+STRUCTURE (for architectures, pipelines, systems — not just biology):
+- Don't settle for two boxes drifting around. Build the real structure: a row or
+  stack of labeled boxes for the stages/layers, with `arrow`s showing the data
+  FLOW between them, and a small `molecule` or `box` that travels through the
+  pipeline so the viewer follows one input being transformed step by step.
+- Use `pulse` when a stage activates and `highlight` to spotlight the active part.
+
 PRINCIPLES:
 - The VISUAL must carry the explanation; captions only narrate. Show cause and
   effect (e.g. matching letters), not just steps.

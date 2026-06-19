@@ -461,6 +461,35 @@ function labelBelow(a: FActor, cx: number, yBelow: number, color = '#475569'): s
     : '';
 }
 
+// Word-wrap `label` to fit `boxW`, shrinking the font until the block also fits
+// `boxH`. Returns null if it can't fit even at the minimum size — the caller then
+// draws the label just below the box instead of letting it overflow (truncate).
+function fitLabel(
+  label: string,
+  boxW: number,
+  boxH: number,
+): { lines: string[]; fontSize: number } | null {
+  const padX = 12, padY = 8, MIN = 8, MAX = 14;
+  const availW = Math.max(8, boxW - padX);
+  const availH = Math.max(8, boxH - padY);
+  const words = label.split(/\s+/).filter(Boolean);
+  for (let fs = MAX; fs >= MIN; fs--) {
+    const charW = fs * 0.58, lineH = fs * 1.18;
+    const maxChars = Math.max(1, Math.floor(availW / charW));
+    const lines: string[] = [];
+    let cur = '';
+    for (const word of words) {
+      const cand = cur ? `${cur} ${word}` : word;
+      if (cand.length <= maxChars || !cur) cur = cand;   // force-place an overlong word
+      else { lines.push(cur); cur = word; }
+    }
+    if (cur) lines.push(cur);
+    const longest = Math.max(0, ...lines.map((l) => l.length));
+    if (longest <= maxChars && lines.length * lineH <= availH) return { lines, fontSize: fs };
+  }
+  return null;
+}
+
 function drawBox(a: FActor, st: ActorState, fx: ActorFx): string {
   if (st.opacity <= 0.01) return '';
   const cx = sx(st.x), cy = sy(st.y);
@@ -468,13 +497,31 @@ function drawBox(a: FActor, st: ActorState, fx: ActorFx): string {
   const c = a.color ?? '#64748b';
   const x = cx - w / 2, y = cy - h / 2;
   const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
-  out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${c}"/>`);
+  out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${c}" stroke="#0f172a" stroke-opacity="0.18"/>`);
   out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${(h * 0.32).toFixed(1)}" rx="4" fill="#ffffff" opacity="0.15"/>`);
   if (fx.fill > 0) {  // optional fill level from the bottom
     const fh = h * fx.fill;
     out.push(`<rect x="${x.toFixed(1)}" y="${(y + h - fh).toFixed(1)}" width="${w.toFixed(1)}" height="${fh.toFixed(1)}" rx="4" fill="#ffffff" opacity="0.25"/>`);
   }
-  if (a.label) out.push(`<text x="${cx.toFixed(1)}" y="${(cy + 5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">${esc(a.label)}</text>`);
+  if (a.label) {
+    // Large boxes read as containers (the small boxes move inside/around them),
+    // so put their label at the top instead of the center to avoid collisions.
+    const isContainer = (a.h ?? 10) >= 18 || (a.w ?? 14) >= 30;
+    const fit = isContainer
+      ? fitLabel(a.label, w, Math.min(h, hpx(7)))   // reserve only a top band
+      : fitLabel(a.label, w, h);
+    if (fit) {
+      const lh = fit.fontSize * 1.18;
+      const top = isContainer
+        ? y + 8 + fit.fontSize * 0.8
+        : cy - ((fit.lines.length - 1) * lh) / 2 + fit.fontSize * 0.34;
+      fit.lines.forEach((ln, i) =>
+        out.push(`<text x="${cx.toFixed(1)}" y="${(top + i * lh).toFixed(1)}" text-anchor="middle" font-size="${fit.fontSize}" font-weight="700" fill="#ffffff">${esc(ln)}</text>`));
+    } else {
+      // Too small to hold the text — label it just below, in the box color.
+      out.push(`<text x="${cx.toFixed(1)}" y="${(y + h + 14).toFixed(1)}" text-anchor="middle" font-size="12" font-weight="700" fill="${c}">${esc(a.label)}</text>`);
+    }
+  }
   out.push('</g>');
   return out.join('');
 }
