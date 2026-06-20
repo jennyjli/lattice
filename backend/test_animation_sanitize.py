@@ -68,6 +68,47 @@ def test_bad_coord_pair_falls_back_to_default():
     assert spec.actors[0].at == [50.0, 50.0]   # Actor.at default
 
 
+def test_drops_malformed_events_keeps_rest():
+    """A few bad events (missing action/actor, invalid action, unknown actor)
+    are dropped — the rest of the animation survives instead of being discarded."""
+    data = {
+        "title": "Quantum tunneling",
+        "actors": [
+            {"id": "particle", "shape": "molecule", "at": [10, 50]},
+            {"id": "barrier", "shape": "box", "at": [50, 50], "w": 10, "h": 30},
+        ],
+        "events": [
+            {"at": 0, "action": "appear", "actor": "particle"},     # good
+            {"at": 1, "actor": "particle"},                          # missing action
+            {"at": 2, "action": "appear"},                           # missing actor
+            {"at": 3, "action": "teleport", "actor": "particle"},    # invalid action
+            {"at": 4, "action": "move", "actor": "ghost"},           # unknown actor
+            {"at": 5, "action": "move", "actor": "particle", "to": [60, 50]},  # good
+        ],
+    }
+    spec = AnimationSpec.model_validate(sanitize(data))
+    assert len(spec.events) == 2
+    assert [e.action for e in spec.events] == ["appear", "move"]
+
+
+def test_drops_actor_with_invalid_shape():
+    """An actor with a bogus shape is removed, and events targeting it go too."""
+    data = {
+        "title": "X",
+        "actors": [
+            {"id": "a", "shape": "box", "at": [10, 20]},
+            {"id": "b", "shape": "hypercube", "at": [30, 20]},   # invalid shape
+        ],
+        "events": [
+            {"at": 0, "action": "appear", "actor": "a"},
+            {"at": 1, "action": "appear", "actor": "b"},          # orphaned → dropped
+        ],
+    }
+    spec = AnimationSpec.model_validate(sanitize(data))
+    assert [a.id for a in spec.actors] == ["a"]
+    assert [e.actor for e in spec.events] == ["a"]
+
+
 def test_clean_spec_untouched():
     """A well-formed spec passes through unchanged."""
     good = {
@@ -84,6 +125,8 @@ TESTS = [
     ("coerces every known slip type",        test_coerces_all_known_slips),
     ("required event `at` kept playable",    test_required_event_at_kept_playable),
     ("bad coord pair → default position",    test_bad_coord_pair_falls_back_to_default),
+    ("drops malformed events, keeps rest",   test_drops_malformed_events_keeps_rest),
+    ("drops actor with invalid shape",       test_drops_actor_with_invalid_shape),
     ("clean spec untouched",                 test_clean_spec_untouched),
 ]
 

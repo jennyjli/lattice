@@ -13,7 +13,7 @@ gets None and falls back to the procedural renderers.
 import json
 import re
 import time
-from typing import Optional
+from typing import Optional, get_args
 
 from google import genai
 from openai import OpenAI
@@ -26,7 +26,10 @@ from config import (
     OPENAI_API_KEY,
     MODEL_NAME,
 )
-from animation_spec import AnimationSpec, CRISPR_FALLBACK_SPEC, TUNNEL_FALLBACK_SPEC
+from animation_spec import AnimationSpec, Action, Shape, CRISPR_FALLBACK_SPEC, TUNNEL_FALLBACK_SPEC
+
+_VALID_SHAPES = set(get_args(Shape))
+_VALID_ACTIONS = set(get_args(Action))
 from analyzer import ConceptAnalysis
 
 
@@ -295,16 +298,35 @@ no commentary."""
         if not isinstance(data, dict):
             return data
         fix_scalar(data, "duration")
+
+        # Keep only well-formed actors (valid shape + id); coerce their numbers.
+        actors = []
         for a in data.get("actors") or []:
+            if not (isinstance(a, dict) and a.get("id") and a.get("shape") in _VALID_SHAPES):
+                continue
             for k in ("size", "w", "h", "rotate"):
                 fix_scalar(a, k)
             for k in ("at", "span"):
                 fix_pair(a, k)
+            actors.append(a)
+        data["actors"] = actors
+        actor_ids = {a["id"] for a in actors}
+
+        # Drop malformed events (missing/invalid action, unknown actor) rather than
+        # discarding the whole animation — a rich 63-event spec shouldn't be lost
+        # because the model fumbled a handful of events.
+        events = []
         for e in data.get("events") or []:
+            if not isinstance(e, dict):
+                continue
             for k in ("at", "dur", "at_x"):
                 fix_scalar(e, k)
             fix_pair(e, "to")
             e.setdefault("at", 0.0)     # `at` is required — keep the event playable
+            if e.get("action") in _VALID_ACTIONS and e.get("actor") in actor_ids:
+                events.append(e)
+        data["events"] = events
+
         for c in data.get("camera") or []:
             for k in ("at", "zoom", "dur"):
                 fix_scalar(c, k)
