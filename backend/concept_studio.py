@@ -15,6 +15,7 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional
 
 from google import genai
+from google.genai import types
 from openai import OpenAI
 
 from config import (
@@ -112,7 +113,7 @@ Return ONLY valid JSON:
 }}"""
 
         try:
-            raw = self._call_llm(prompt)
+            raw = self._call_llm(prompt, grounded=True)
             data = self._parse_json(raw)
             return ConceptExtraction(
                 primary_concept=data.get("primary_concept", text.strip()[:100]),
@@ -176,7 +177,7 @@ Rules:
 - Return ONLY the JSON object. No markdown fences, no extra text."""
 
         try:
-            raw = self._call_llm(prompt)
+            raw = self._call_llm(prompt, grounded=True)
             data = self._parse_json(raw)
             return LearningCard(
                 title=data.get("title", concept_name),
@@ -250,13 +251,35 @@ Rules:
 
     # ── LLM plumbing ───────────────────────────────────────────────────────────
 
-    def _call_llm(self, prompt: str) -> str:
+    def _call_llm(self, prompt: str, grounded: bool = False) -> str:
         if self._gemini_client:
-            response = self._gemini_client.models.generate_content(
-                model=GEMINI_TEXT_MODEL,
-                contents=prompt,
-            )
-            return response.text.strip()
+            # Grounding lets the model resolve current concepts it has no strong
+            # parametric memory of (e.g. "MCP" → Model Context Protocol) via Google
+            # Search, mirroring the Gemini app. Fall back to a plain call on error.
+            config = None
+            if grounded:
+                try:
+                    config = types.GenerateContentConfig(
+                        tools=[types.Tool(google_search=types.GoogleSearch())]
+                    )
+                except Exception:
+                    config = None
+            try:
+                response = self._gemini_client.models.generate_content(
+                    model=GEMINI_TEXT_MODEL,
+                    contents=prompt,
+                    config=config,
+                )
+                return response.text.strip()
+            except Exception as e:
+                if grounded:
+                    print(f"⚠️  ConceptStudio: grounded call failed ({str(e)[:80]}); retrying ungrounded")
+                    response = self._gemini_client.models.generate_content(
+                        model=GEMINI_TEXT_MODEL,
+                        contents=prompt,
+                    )
+                    return response.text.strip()
+                raise
 
         if self._openai_client:
             response = self._openai_client.chat.completions.create(
