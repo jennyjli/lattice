@@ -284,29 +284,34 @@ export default function LearningCard({ data, onSave, isSaved, isSaving }: Props)
         )}
 
         {/* ── Personalization context ── */}
+        {/* Only show concepts actually related to this one (graph neighbors),
+            not the whole atlas. If none relate yet, say so plainly. */}
         {user_state.known_context.length > 0 && (
           <>
             <Divider />
             <section>
               <SectionLabel>Personalized using</SectionLabel>
-              <div className="flex flex-wrap gap-1.5">
-                {user_state.known_context.slice(0, 10).map((k) => (
-                  <span
-                    key={k.name}
-                    className={`text-xs px-2 py-0.5 rounded border ${
-                      user_state.graph_related?.includes(k.name)
-                        ? 'bg-brand-50 text-brand-600 border-brand-100'
-                        : 'bg-gray-50 text-gray-400 border-gray-100'
-                    }`}
-                    title={`Familiarity: ${k.familiarity_score}${user_state.graph_related?.includes(k.name) ? ' · Graph neighbor' : ''}`}
-                  >
-                    {k.name}
-                  </span>
-                ))}
-              </div>
-              {user_state.graph_related?.length > 0 && (
-                <p className="text-[10px] text-gray-300 mt-1.5">
-                  Highlighted concepts are directly connected in your knowledge graph.
+              {user_state.graph_related?.length > 0 ? (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {user_state.graph_related.map((name) => (
+                      <span
+                        key={name}
+                        className="text-xs px-2 py-0.5 rounded border bg-brand-50 text-brand-600 border-brand-100"
+                        title="Directly connected in your knowledge graph"
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-300 mt-1.5">
+                    Concepts from your atlas that connect to this one.
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-gray-400">
+                  No related concepts in your atlas yet — as you learn connected
+                  ideas, they’ll show up here.
                 </p>
               )}
             </section>
