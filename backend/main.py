@@ -363,6 +363,21 @@ async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)
         # 6 — knowledge gaps: prerequisites the user hasn't learned well yet
         gaps = svc.get_knowledge_gaps(db, user_id, card.prerequisites)
 
+        # 7 — canonical reference image: an existing real diagram for this concept,
+        # shown alongside the generated visualization. Independent of viz type and
+        # LLM quota (Wikipedia HTTP). Query with the disambiguated card title.
+        reference = web_researcher.wikipedia_reference(card.title or primary)
+
+        # Reliable "did generation actually produce something" signal (no quality
+        # judgment): a real animation spec or a 3D scene. A procedural SVG fallback
+        # or a stub card (quota/503) counts as not-ok, so the UI emphasizes the
+        # reference instead.
+        card_is_stub = card.summary.strip().startswith("A concept in") and not card.how_it_works.strip()
+        generated_viz_ok = (
+            (viz_spec is not None)
+            or (plan.visualization_type == "3d" and bool(plan.scene_data))
+        ) and not card_is_stub
+
         # Depth mode label for the frontend
         ec = uc.encounter_count
         depth_mode = "first_look" if ec <= 1 else "building" if ec <= 3 else "deepening"
@@ -378,6 +393,8 @@ async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)
                 "svg":        svg,
                 "spec":       viz_spec,
             },
+            "reference":        reference,
+            "generated_viz_ok": generated_viz_ok,
             "knowledge_gaps": gaps,
             "user_state": {
                 "familiarity_score": uc.familiarity_score,

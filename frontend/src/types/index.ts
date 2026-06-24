@@ -149,6 +149,14 @@ export interface ConceptExplanationResponse {
     svg?: string;
     spec?: AnimationSpec;
   };
+  reference?: {
+    found: boolean;
+    image_url: string | null;
+    page_url: string | null;
+    title: string | null;
+    description: string;
+  };
+  generated_viz_ok?: boolean;
   knowledge_gaps: KnowledgeGap[];
   user_state: {
     familiarity_score: number;

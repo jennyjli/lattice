@@ -15,6 +15,12 @@ from PIL import Image
 
 
 class WebResearcher:
+    # Wikimedia's API policy returns 403 to requests without a descriptive
+    # User-Agent (httpx's default is blocked). Identify the app on every call.
+    HEADERS = {
+        "User-Agent": "Lattice/0.2 (concept learning visualizer; https://github.com/jennyjli/lattice)"
+    }
+
     def __init__(self):
         self.timeout = 6.0
 
@@ -98,7 +104,7 @@ class WebResearcher:
                     "iiurlwidth": "320",
                     "format": "json",
                 },
-                timeout=self.timeout,
+                timeout=self.timeout, headers=self.HEADERS,
             )
             if r.status_code != 200:
                 return []
@@ -151,7 +157,7 @@ class WebResearcher:
                     "per_page": str(limit),
                     "rank": "species,genus,family,order",
                 },
-                timeout=self.timeout,
+                timeout=self.timeout, headers=self.HEADERS,
             )
             if r.status_code != 200:
                 return []
@@ -183,6 +189,61 @@ class WebResearcher:
             print(f"iNaturalist search failed for {query!r}: {e}")
             return []
 
+    # ── Canonical reference image (any concept) ──────────────────────────────────
+
+    def wikipedia_reference(self, query: str) -> dict:
+        """
+        Best canonical Wikipedia image + article for a (disambiguated) concept.
+
+        Unlike search_concept (built for the 3D particle pipeline), this is a
+        lightweight lookup meant for ANY concept — to show an existing, real
+        diagram alongside the generated visualization.
+
+        Returns { found, image_url, page_url, title, description }.
+        """
+        ref = self._wiki_rest(query)
+        if not ref["found"]:
+            # Exact-title lookup missed — fall back to search, then re-fetch.
+            try:
+                r = httpx.get(
+                    "https://en.wikipedia.org/w/api.php",
+                    params={
+                        "action": "query", "list": "search", "srsearch": query,
+                        "format": "json", "srlimit": 1,
+                    },
+                    timeout=self.timeout, headers=self.HEADERS,
+                )
+                if r.status_code == 200:
+                    hits = r.json().get("query", {}).get("search", [])
+                    if hits:
+                        ref = self._wiki_rest(hits[0]["title"])
+            except Exception as e:
+                print(f"Wikipedia reference search failed for {query!r}: {e}")
+        return ref
+
+    def _wiki_rest(self, title: str) -> dict:
+        out = {"found": False, "image_url": None, "page_url": None, "title": None, "description": ""}
+        try:
+            url = (
+                "https://en.wikipedia.org/api/rest_v1/page/summary/"
+                + urllib.parse.quote(title, safe="")
+            )
+            r = httpx.get(url, timeout=self.timeout, headers=self.HEADERS, follow_redirects=True)
+            if r.status_code == 200:
+                d = r.json()
+                image_url = (d.get("thumbnail") or {}).get("source")
+                page_url = ((d.get("content_urls") or {}).get("desktop") or {}).get("page")
+                out.update(
+                    found=bool(image_url),
+                    image_url=image_url,
+                    page_url=page_url,
+                    title=d.get("title"),
+                    description=(d.get("extract") or "")[:200],
+                )
+        except Exception as e:
+            print(f"Wikipedia reference lookup failed for {title!r}: {e}")
+        return out
+
     # ── Wikipedia helpers ──────────────────────────────────────────────────────
 
     def _wikipedia_summary(self, query: str) -> tuple[Optional[str], str]:
@@ -192,7 +253,7 @@ class WebResearcher:
                 "https://en.wikipedia.org/api/rest_v1/page/summary/"
                 + urllib.parse.quote(query, safe="")
             )
-            r = httpx.get(url, timeout=self.timeout, follow_redirects=True)
+            r = httpx.get(url, timeout=self.timeout, headers=self.HEADERS, follow_redirects=True)
             if r.status_code == 200:
                 data = r.json()
                 thumbnail = data.get("thumbnail", {})
@@ -215,7 +276,7 @@ class WebResearcher:
                     "format": "json",
                     "srlimit": 1,
                 },
-                timeout=self.timeout,
+                timeout=self.timeout, headers=self.HEADERS,
             )
             if r.status_code == 200:
                 results = r.json().get("query", {}).get("search", [])
@@ -235,7 +296,7 @@ class WebResearcher:
         background — keeps hue but ensures they read well against #030303.
         """
         try:
-            r = httpx.get(image_url, timeout=self.timeout, follow_redirects=True)
+            r = httpx.get(image_url, timeout=self.timeout, headers=self.HEADERS, follow_redirects=True)
             img = Image.open(io.BytesIO(r.content)).convert("RGB")
             img = img.resize((80, 80), Image.LANCZOS)
 

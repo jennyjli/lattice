@@ -152,24 +152,76 @@ export default function LearningCard({ data, onSave, isSaved, isSaving }: Props)
         </section>
 
         {/* ── Visual (animation player, particle viewer, or SVG) ── */}
-        {(hasSpec || has3D || visualization.svg) && (
-          <>
-            <Divider />
-            <section>
-              <SectionLabel>Visual</SectionLabel>
-              {hasSpec && visualization.spec ? (
-                <AnimationPlayer spec={visualization.spec} />
-              ) : has3D && visualization.scene_data ? (
-                <ThreeDViewer sceneData={visualization.scene_data} />
-              ) : visualization.svg ? (
-                <div
-                  className="rounded-lg overflow-hidden border border-gray-100"
-                  dangerouslySetInnerHTML={{ __html: visualization.svg }}
-                />
-              ) : null}
-            </section>
-          </>
-        )}
+        {(() => {
+          const ref = data.reference;
+          const hasRef = !!ref?.found && !!ref.image_url;
+          const hasGenerated = hasSpec || has3D || !!visualization.svg;
+          if (!hasGenerated && !hasRef) return null;
+
+          const generated =
+            hasSpec && visualization.spec ? (
+              <AnimationPlayer spec={visualization.spec} />
+            ) : has3D && visualization.scene_data ? (
+              <ThreeDViewer sceneData={visualization.scene_data} />
+            ) : visualization.svg ? (
+              <div
+                className="rounded-lg overflow-hidden border border-gray-100"
+                dangerouslySetInnerHTML={{ __html: visualization.svg }}
+              />
+            ) : null;
+
+          const referenceBlock = hasRef ? (
+            <a
+              href={ref!.page_url ?? '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block rounded-lg overflow-hidden border border-gray-100 bg-gray-50 hover:border-gray-200 transition-colors"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={ref!.image_url!}
+                alt={ref!.title ?? 'Reference diagram'}
+                className="w-full object-contain max-h-96 bg-white"
+              />
+              <div className="px-3 py-2 text-[11px] text-gray-400">
+                Reference: {ref!.title} — via Wikipedia
+              </div>
+            </a>
+          ) : null;
+
+          // When generation fell back (no real spec/3D, or a stub card), lead
+          // with the real reference diagram and demote the generated one.
+          const referenceFirst = hasRef && data.generated_viz_ok === false;
+
+          return (
+            <>
+              <Divider />
+              <section>
+                <SectionLabel>Visual</SectionLabel>
+                <div className="space-y-3">
+                  {referenceFirst ? (
+                    <>
+                      {referenceBlock}
+                      {generated && (
+                        <details className="text-xs text-gray-400">
+                          <summary className="cursor-pointer hover:text-gray-600">
+                            Show generated visualization (experimental)
+                          </summary>
+                          <div className="mt-2">{generated}</div>
+                        </details>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {generated}
+                      {referenceBlock}
+                    </>
+                  )}
+                </div>
+              </section>
+            </>
+          );
+        })()}
 
         <Divider />
 
