@@ -72,6 +72,16 @@ class VisualizationPlanner:
         "process", "mechanism", "reaction", "cycle", "pathway", "temporal",
         "workflow", "algorithm",
     )
+    # Abstract/computational domains have no physical FORM, so the 3D particle
+    # renderer (built for galaxies, buildings, molecules) only ever produces a
+    # meaningless blob for them — e.g. "transformer architecture" must NOT route
+    # to 3D just because "architecture" reads as structural.
+    _ABSTRACT_DOMAINS = (
+        "artificial intelligence", "machine learning", "deep learning",
+        "natural language", "nlp", "computer science", "software", "computing",
+        "data science", "mathematics", "statistics", "economics", "finance",
+        "cryptograph", "information theory",
+    )
 
     def _choose_visualization_type(self, analysis: ConceptAnalysis) -> str:
         """Choose primary visualization type."""
@@ -85,11 +95,14 @@ class VisualizationPlanner:
             or any(h in domain for h in ("architect", "astronom", "anatom", "geograph"))
         )
         is_process = any(h in ctype for h in self._PROCESS_HINTS)
+        # An abstract concept is never a physical 3D structure, regardless of how
+        # "structural" its wording (architecture/structure) sounds.
+        is_abstract = any(h in domain for h in self._ABSTRACT_DOMAINS)
 
         # Structural/spatial concepts (buildings, landmarks, anatomy, objects,
         # astronomical bodies) → 3D model, even if the LLM also tagged steps.
         # A genuine process that merely happens in 3D still animates.
-        if (is_structural or "3d" in recs or "spatial" in recs) and not is_process:
+        if (is_structural or "3d" in recs or "spatial" in recs) and not is_process and not is_abstract:
             return "3d"
 
         # Animation + mechanisms beats 3d: "How does X work?" is a process
@@ -98,7 +111,7 @@ class VisualizationPlanner:
             return "animation"
 
         # 3D/spatial for structural/spatial concepts with no process animation
-        if "3d" in recs or "spatial" in recs:
+        if ("3d" in recs or "spatial" in recs) and not is_abstract:
             return "3d"
 
         # Comparison for before/after states
