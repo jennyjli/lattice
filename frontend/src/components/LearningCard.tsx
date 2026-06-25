@@ -9,6 +9,8 @@ interface Props {
   onSave: () => void;
   isSaved: boolean;
   isSaving: boolean;
+  /** Issue a fresh query for the given concept (clicking a prerequisite/related). */
+  onConceptClick?: (text: string) => void;
 }
 
 const DEPTH_CONFIG = {
@@ -50,28 +52,44 @@ function FamiliarityBar({ score, encounters }: { score: number; encounters: numb
 function ConceptPill({
   label,
   variant,
+  onClick,
 }: {
   label: string;
   variant: 'prerequisite' | 'related';
+  onClick?: (label: string) => void;
 }) {
   const styles =
     variant === 'prerequisite'
       ? 'bg-amber-50 text-amber-700 border-amber-200'
       : 'bg-brand-50 text-brand-700 border-brand-200';
+  const hover =
+    variant === 'prerequisite' ? 'hover:bg-amber-100' : 'hover:bg-brand-100';
   const arrow = variant === 'prerequisite' ? '←' : '→';
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border ${styles}`}
-    >
+  const base = `inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border ${styles}`;
+  const inner = (
+    <>
       <span className="opacity-50">{arrow}</span>
       {label}
-    </span>
+    </>
   );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={() => onClick(label)}
+        title={`Explore "${label}"`}
+        className={`${base} ${hover} cursor-pointer text-left transition-colors`}
+      >
+        {inner}
+      </button>
+    );
+  }
+  return <span className={base}>{inner}</span>;
 }
 
 // ── Main card ─────────────────────────────────────────────────────────────────
 
-export default function LearningCard({ data, onSave, isSaved, isSaving }: Props) {
+export default function LearningCard({ data, onSave, isSaved, isSaving, onConceptClick }: Props) {
   const { card, visualization, user_state, concept_name, supporting_concepts, knowledge_gaps } = data;
   const [showRawJson, setShowRawJson] = useState(false);
 
@@ -272,7 +290,7 @@ export default function LearningCard({ data, onSave, isSaved, isSaving }: Props)
               <SectionLabel>Prerequisites</SectionLabel>
               <div className="flex flex-col gap-1.5">
                 {card.prerequisites.map((p) => (
-                  <ConceptPill key={p} label={p} variant="prerequisite" />
+                  <ConceptPill key={p} label={p} variant="prerequisite" onClick={onConceptClick} />
                 ))}
               </div>
             </section>
@@ -282,7 +300,7 @@ export default function LearningCard({ data, onSave, isSaved, isSaving }: Props)
               <SectionLabel>Related Concepts</SectionLabel>
               <div className="flex flex-col gap-1.5">
                 {card.related.map((r) => (
-                  <ConceptPill key={r} label={r} variant="related" />
+                  <ConceptPill key={r} label={r} variant="related" onClick={onConceptClick} />
                 ))}
               </div>
             </section>

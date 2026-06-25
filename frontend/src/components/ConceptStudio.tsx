@@ -54,13 +54,15 @@ export default function ConceptStudio() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [inputText]);
 
-  const handleLearn = async () => {
-    if (!inputText.trim()) return;
+  const handleLearn = async (overrideText?: string) => {
+    const text = (overrideText ?? inputText).trim();
+    if (!text) return;
+    if (overrideText !== undefined) setInputText(overrideText);
     setIsExplaining(true);
     setError(null);
     setIsSaved(false);
     try {
-      const result = await latticeClient.explainConcept(inputText);
+      const result = await latticeClient.explainConcept(text);
       setExplanation(result);
       // Scroll to card on mobile
       setTimeout(() => cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -158,7 +160,7 @@ export default function ConceptStudio() {
               </div>
 
               <button
-                onClick={handleLearn}
+                onClick={() => handleLearn()}
                 disabled={isExplaining || !inputText.trim()}
                 className="w-full py-2.5 rounded-lg text-sm font-semibold bg-gray-900 text-white hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-all"
               >
@@ -232,6 +234,10 @@ export default function ConceptStudio() {
                 onSave={handleSave}
                 isSaved={isSaved}
                 isSaving={isSaving}
+                onConceptClick={(text) => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  handleLearn(text);
+                }}
               />
             )}
           </main>
