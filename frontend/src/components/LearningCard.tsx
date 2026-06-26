@@ -33,19 +33,23 @@ function Divider() {
   return <hr className="border-gray-100 my-5" />;
 }
 
-function FamiliarityBar({ score, encounters }: { score: number; encounters: number }) {
+// A coarse, honest familiarity status. The underlying score is a clicks-based
+// heuristic (views + saves), so we avoid showing a fake-precise "N/100" number
+// and surface a simple tier instead.
+function FamiliarityStatus({ score, encounters }: { score: number; encounters: number }) {
+  const { label, color } =
+    score >= 60
+      ? { label: 'Familiar', color: 'bg-purple-50 text-purple-600' }
+      : encounters >= 2 || score >= 20
+      ? { label: 'Seen before', color: 'bg-blue-50 text-blue-500' }
+      : { label: 'New to you', color: 'bg-gray-100 text-gray-500' };
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all duration-700"
-          style={{ width: `${score}%` }}
-        />
-      </div>
-      <span className="text-xs text-gray-400 whitespace-nowrap tabular-nums">
-        {score}/100 · {encounters} {encounters === 1 ? 'view' : 'views'}
-      </span>
-    </div>
+    <span
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-medium rounded-full ${color}`}
+    >
+      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
+      {label}
+    </span>
   );
 }
 
@@ -154,7 +158,7 @@ export default function LearningCard({ data, onSave, isSaved, isSaving, onConcep
         </div>
 
         <div className="mt-4">
-          <FamiliarityBar
+          <FamiliarityStatus
             score={user_state.familiarity_score}
             encounters={user_state.encounter_count}
           />
