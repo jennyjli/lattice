@@ -191,35 +191,71 @@ class WebResearcher:
 
     # ── Canonical reference image (any concept) ──────────────────────────────────
 
-    def wikipedia_reference(self, query: str) -> dict:
-        """
-        Best canonical Wikipedia image + article for a (disambiguated) concept.
+    _NONE_REF = {"found": False, "image_url": None, "page_url": None, "title": None, "description": ""}
 
-        Unlike search_concept (built for the 3D particle pipeline), this is a
-        lightweight lookup meant for ANY concept — to show an existing, real
-        diagram alongside the generated visualization.
+    # Generic words that don't identify a concept — excluded when matching a
+    # Wikipedia page's title against the concept, so "world model" isn't satisfied
+    # by "Mental model" sharing only the word "model".
+    _GENERIC_WORDS = {
+        "model", "system", "theory", "concept", "method", "process", "mechanism",
+        "architecture", "structure", "function", "principle", "approach", "the",
+        "a", "an", "of", "in", "and", "or", "to", "for", "with", "on",
+    }
 
-        Returns { found, image_url, page_url, title, description }.
+    def wikipedia_reference(self, query: str, domain: Optional[str] = None) -> dict:
         """
-        ref = self._wiki_rest(query)
-        if not ref["found"]:
-            # Exact-title lookup missed — fall back to search, then re-fetch.
-            try:
-                r = httpx.get(
-                    "https://en.wikipedia.org/w/api.php",
-                    params={
-                        "action": "query", "list": "search", "srsearch": query,
-                        "format": "json", "srlimit": 1,
-                    },
-                    timeout=self.timeout, headers=self.HEADERS,
-                )
-                if r.status_code == 200:
-                    hits = r.json().get("query", {}).get("search", [])
-                    if hits:
-                        ref = self._wiki_rest(hits[0]["title"])
-            except Exception as e:
-                print(f"Wikipedia reference search failed for {query!r}: {e}")
-        return ref
+        Best canonical Wikipedia image + article for a concept, with a relevance
+        gate so we never show an off-topic image (e.g. "world model" → "Mental
+        model"'s 18th-century engraving). Better to show NO image than a wrong one.
+
+        Returns { found, image_url, page_url, title, description }; found=False
+        when no relevant page with an image exists.
+        """
+        # 1) Exact / redirect lookup on the (disambiguated) title.
+        cand = self._wiki_rest(query)
+        if cand["image_url"] and self._is_relevant(cand["title"], query):
+            return cand
+
+        # 2) Domain-disambiguated search — "world model" alone resolves to the
+        #    wrong sense; "world model artificial intelligence" ranks the right one.
+        search_q = f"{query} {domain}".strip() if domain else query
+        for title in self._search_titles(search_q, limit=4):
+            cand = self._wiki_rest(title)
+            if cand["image_url"] and self._is_relevant(cand["title"], query):
+                return cand
+
+        return dict(self._NONE_REF)
+
+    def _search_titles(self, query: str, limit: int = 4) -> list[str]:
+        try:
+            r = httpx.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={
+                    "action": "query", "list": "search", "srsearch": query,
+                    "format": "json", "srlimit": str(limit),
+                },
+                timeout=self.timeout, headers=self.HEADERS,
+            )
+            if r.status_code == 200:
+                return [h["title"] for h in r.json().get("query", {}).get("search", [])]
+        except Exception as e:
+            print(f"Wikipedia reference search failed for {query!r}: {e}")
+        return []
+
+    def _significant(self, text: str) -> set:
+        import re
+        return {
+            w for w in re.findall(r"[a-z0-9]+", (text or "").lower())
+            if len(w) > 2 and w not in self._GENERIC_WORDS
+        }
+
+    def _is_relevant(self, page_title: Optional[str], concept: str) -> bool:
+        """A page is relevant if its title shares a distinctive (non-generic) word
+        with the concept. Conservative on purpose: a miss shows no image."""
+        concept_words = self._significant(concept)
+        if not concept_words:
+            return True   # nothing distinctive to check — don't over-reject
+        return bool(concept_words & self._significant(page_title))
 
     def _wiki_rest(self, title: str) -> dict:
         out = {"found": False, "image_url": None, "page_url": None, "title": None, "description": ""}

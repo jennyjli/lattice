@@ -366,7 +366,7 @@ async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)
         # 7 — canonical reference image: an existing real diagram for this concept,
         # shown alongside the generated visualization. Independent of viz type and
         # LLM quota (Wikipedia HTTP). Query with the disambiguated card title.
-        reference = web_researcher.wikipedia_reference(card.title or primary)
+        reference = web_researcher.wikipedia_reference(card.title or primary, domain=card.domain)
 
         # Reliable "did generation actually produce something" signal (no quality
         # judgment): a real animation spec or a 3D scene. A procedural SVG fallback
