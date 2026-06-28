@@ -38,5 +38,10 @@ IMAGE_SIZE = os.getenv('IMAGE_SIZE', '512x512')
 # Database — SQLite for local dev, PostgreSQL in prod
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./lattice.db')
 
+# Local concept embeddings (fastembed). When enabled and the package is present,
+# powers semantic dedup + similarity-based personalization. Degrades to the
+# graph/domain heuristics if disabled or unavailable.
+EMBEDDINGS_ENABLED = os.getenv('EMBEDDINGS_ENABLED', 'true').lower() == 'true'
+
 # Default user for MVP (no auth yet)
 DEFAULT_USER_ID = os.getenv('DEFAULT_USER_ID', 'default')

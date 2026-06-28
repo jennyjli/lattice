@@ -10,3 +10,4 @@ Pillow>=10.0.0
 sqlalchemy>=2.0.0
 alembic>=1.13.0
 python-slugify>=8.0.0
+fastembed>=0.7.0  # optional: local concept embeddings (semantic dedup + relatedness)

@@ -13,6 +13,7 @@ from typing import Optional
 from slugify import slugify
 from sqlalchemy.orm import Session
 
+import embeddings as emb
 from models import Concept, ConceptRelationship, Domain, LearningSession, UserConcept
 
 
@@ -60,18 +61,28 @@ def create_or_update_concept(
     # the same slug and must resolve to the same row instead of colliding.
     slug = slugify(name)
     concept = get_concept_by_name(db, name) or get_concept_by_slug(db, slug)
+
+    # Semantic dedup: merge near-identical concepts ("neural nets" → an existing
+    # "Neural networks" node) so the graph doesn't fragment across synonyms.
+    vector = emb.encode(f"{name}. {summary}") if emb.available() else None
+    if not concept and vector is not None:
+        concept = find_similar_concept(db, vector, emb.DEDUP_THRESHOLD)
+
     if not concept:
         concept = Concept(
             name=name,
             slug=slug,
             summary=summary,
             learning_card_data=learning_card_data,
+            embedding=vector,
         )
         db.add(concept)
     else:
         concept.summary = summary
         concept.learning_card_data = learning_card_data
         concept.updated_at = datetime.utcnow()
+        if vector is not None:
+            concept.embedding = vector
 
     if domain_name:
         domain = get_or_create_domain(db, domain_name)
@@ -79,6 +90,19 @@ def create_or_update_concept(
 
     db.flush()
     return concept
+
+
+def find_similar_concept(db: Session, vector: bytes, threshold: float) -> Optional[Concept]:
+    """Nearest existing concept by cosine over stored embeddings, if above
+    `threshold`. Brute-force — fine at personal scale (hundreds–thousands)."""
+    query_vec = emb.unpack(vector)
+    best: Optional[Concept] = None
+    best_sim = 0.0
+    for c in db.query(Concept).filter(Concept.embedding.isnot(None)).all():
+        sim = emb.cosine(query_vec, emb.unpack(c.embedding))
+        if sim > best_sim:
+            best_sim, best = sim, c
+    return best if best_sim >= threshold else None
 
 
 def upsert_relationships(
@@ -292,12 +316,28 @@ def get_contextual_knowledge(db: Session, user_id: str, concept_name: str) -> di
             domain_concept_names = {c.name for c in domain_obj.concepts}
             domain_known = {k["name"] for k in all_known if k["name"] in domain_concept_names}
 
+    # Semantic similarity (optional): relate concepts by meaning even without a
+    # stored edge — densifies a young atlas and surfaces synonyms/near-neighbors.
+    # Embed the query name fresh so it works on a concept's first explanation too.
+    sim_by_name: dict[str, float] = {}
+    if emb.available():
+        query_vec = emb.unpack(emb.encode(concept_name))
+        if query_vec is not None:
+            for uc in db.query(UserConcept).filter_by(user_id=user_id).all():
+                c = uc.concept
+                if c and c.embedding and c.name.lower() != concept_name.lower():
+                    sim_by_name[c.name] = emb.cosine(query_vec, emb.unpack(c.embedding))
+    # Treat strongly-similar known concepts as related (they join graph_related).
+    graph_neighbors |= {n for n, s in sim_by_name.items() if s >= emb.RELATED_THRESHOLD}
+
     def _relevance(k: dict) -> int:
         bonus = 0
         if k["name"] in graph_neighbors:
             bonus += 30
         elif k["name"] in domain_known:
             bonus += 10
+        # Reward semantic closeness (bge cosine floors ~0.5 → scale the excess).
+        bonus += int(max(0.0, sim_by_name.get(k["name"], 0.0) - 0.5) * 100)
         return k["familiarity_score"] + bonus
 
     prioritized = sorted(all_known, key=_relevance, reverse=True)[:12]

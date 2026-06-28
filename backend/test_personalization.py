@@ -27,8 +27,13 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 import concept_service as svc
+import embeddings as emb
 from concept_studio import ConceptStudio
 from models import Base, Concept, ConceptRelationship, UserConcept
+
+# These tests cover the base graph/domain/familiarity scoring; pin embeddings off
+# so they stay deterministic regardless of whether fastembed is installed.
+emb.set_enabled(False)
 
 USER = "u1"
 

@@ -19,6 +19,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -71,6 +72,7 @@ class Concept(Base):
     domain_id         = Column(String(36), ForeignKey("domains.id"), nullable=True)
     summary           = Column(Text, nullable=True)
     learning_card_data = Column(JSON, nullable=True)   # full structured card
+    embedding         = Column(LargeBinary, nullable=True)  # packed float32 concept vector
     created_at        = Column(DateTime, default=datetime.utcnow)
     updated_at        = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
