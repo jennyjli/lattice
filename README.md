@@ -43,9 +43,32 @@ query → extract concept → personalize (atlas) → generate card (LLM)
                                               ↘ analyze → plan → render visualization
 ```
 
-- **Personalization** ([backend/concept_service.py](backend/concept_service.py)) — builds a context from the user's known concepts, scoring graph neighbors (+30) and domain peers (+10) above raw familiarity. Explanation depth scales with how many times you've seen the concept.
-- **Visualization** ([backend/animation_director.py](backend/animation_director.py), [renderer.py](backend/renderer.py)) — the LLM emits a declarative `AnimationSpec` (actors + timeline) rendered by a generic player, with hand-authored fallbacks. Structural concepts route to three.js 3D scenes.
-- **Stack** — Next.js + TypeScript (frontend), FastAPI + SQLAlchemy (backend), SQLite locally / Postgres in prod, Gemini or OpenAI for generation.
+- **Personalization** ([backend/concept_service.py](backend/concept_service.py)) — builds a context from the user's known concepts (see the Knowledge Atlas below), ranking them by relevance to the current concept before handing the top ones to the LLM.
+- **Visualization** ([backend/animation_director.py](backend/animation_director.py), [renderer.py](backend/renderer.py)) — the LLM emits a declarative `AnimationSpec` (actors + timeline) rendered by a generic player, with hand-authored fallbacks. Structural concepts route to three.js 3D scenes; a relevant Wikipedia diagram is shown alongside when one exists.
+- **Stack** — Next.js + TypeScript (frontend), FastAPI + SQLAlchemy (backend), SQLite locally / Postgres in prod, Gemini or OpenAI for generation, fastembed for local concept embeddings.
+
+### How the Knowledge Atlas works
+
+The Atlas is a per-user **knowledge graph** that builds itself as you learn — no folders, tags, or manual linking. It's what every explanation is personalized against.
+
+**Nodes** are concepts. A node is created the first time a concept is explained, or as a *stub* when it's named as a prerequisite/related concept of another card — so an idea can exist in the graph before you've explored it. Each node also stores a local **embedding** (fastembed / `bge-small`) used for semantic matching.
+
+**Edges** are directed relationships (`prerequisite`, `related`), materialized from each generated card's prerequisite/related lists. The graph therefore grows from explanations, not hand-curation.
+
+**Your knowledge is a separate per-user layer.** For every concept you've seen, Lattice tracks a familiarity score and view count (`user_concepts`). The graph of concepts is shared; what *you* know is personal.
+
+- **Familiarity score (0–100):** +5 first view, +3 each revisit (capped), +10 when you save to your Atlas. It counts engagement, not mastery — so the card shows a coarse tier (*New to you · Seen before · Familiar*) instead of a fake-precise number.
+- **Auto-organization:** each concept is assigned a domain by the LLM, and the Atlas groups your concepts into the domains you're growing.
+
+**Personalization — relevance, not just recency.** When explaining concept X, Lattice scores everything you already know by how it relates to X, then hands the top ~12 to the LLM as "what this learner already understands":
+
+- graph neighbors of X that you know → **+30**
+- same-domain concepts → **+10**
+- **embedding similarity** to X → blended in, so related concepts surface even with no stored edge (densifying a young graph)
+
+That ranking is what lets a card say *"building on attention, which you already know…"* and draw analogies from *your* concepts. **Depth** then scales with how many times you've seen X — first principles → nuance → expert (the depth-mode badge).
+
+**Dedup.** A new concept within high embedding similarity of an existing one merges into it, so "neural nets" and "Neural networks" don't fragment into separate nodes.
 
 ## Quick start
 
@@ -90,7 +113,7 @@ Open the frontend and enter a concept (e.g. *"How does CRISPR work?"*).
 - A reliable router (animation / 3D / interactive plot / diagram / static) with graceful fallback, plus an eval set to catch regressions.
 
 **Make the Atlas practically personal** — the engineering behind the benefits above.
-- **Relevance** — replace the flat +30 graph bonus (which loses to high-familiarity noise, see `test_personalization.py` case E) with embeddings + weighted scoring, so the *right* prior knowledge surfaces for analogies and gap-skipping.
+- **Relevance** — embedding similarity now augments the flat +30 graph bonus; next is to *replace* the bonus with fully similarity-weighted scoring (fixing the high-familiarity-noise case in `test_personalization.py` case E) and merge the duplicate nodes that predate dedup.
 - **Decay model** — track familiarity decay over time to drive "refresh before you forget."
 - **Path-finding** — shortest-path over the concept graph from known concepts to a goal, for learning paths.
 - **Progress view** — surface growing domains and a timeline of what you've understood.
