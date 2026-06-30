@@ -113,10 +113,6 @@ class ExplainRequest(BaseModel):
     text: str
     user_id: Optional[str] = None   # defaults to DEFAULT_USER_ID
 
-class ExtractRequest(BaseModel):
-    """Lightweight: identify the primary concept without generating a full card."""
-    text: str
-
 class SaveConceptRequest(BaseModel):
     concept_name: str
     user_id: Optional[str] = None
@@ -277,24 +273,6 @@ async def generate(request: GenerateRequest) -> dict:
 
 
 # ── Knowledge system endpoints ────────────────────────────────────────────────
-
-@app.post("/concept/extract")
-async def extract_concept(request: ExtractRequest) -> dict:
-    """
-    Lightweight: identify the primary + supporting concepts in free-form text.
-    No DB writes. Used for instant feedback in the UI before full card load.
-    """
-    try:
-        extraction = concept_studio.extract_concepts(request.text)
-        return {
-            "primary_concept":     extraction.primary_concept,
-            "supporting_concepts": extraction.supporting_concepts,
-            "domain":              extraction.domain,
-            "input_type":          extraction.input_type,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
-
 
 @app.post("/concept/explain")
 async def explain_concept(request: ExplainRequest, db: Session = Depends(get_db)) -> dict:

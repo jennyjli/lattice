@@ -125,13 +125,6 @@ export interface LearningCardData {
   analogy?: string | null;
 }
 
-export interface ConceptExtractionResponse {
-  primary_concept: string;
-  supporting_concepts: string[];
-  domain: string;
-  input_type: 'concept' | 'question' | 'paragraph';
-}
-
 export interface KnowledgeGap {
   name: string;
   familiarity_score: number;

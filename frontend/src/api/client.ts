@@ -2,7 +2,6 @@ import axios, { AxiosInstance } from 'axios';
 import {
   ConceptAnalysis,
   VisualizationPlan,
-  ConceptExtractionResponse,
   ConceptExplanationResponse,
   AtlasResponse,
   AnimationSpec,
@@ -47,12 +46,6 @@ class LatticeClient {
   }
 
   // ── Knowledge system ───────────────────────────────────────────────────────
-
-  /** Identify the primary concept without generating a full card (fast). */
-  async extractConcept(text: string): Promise<ConceptExtractionResponse> {
-    const r = await this.client.post<ConceptExtractionResponse>('/concept/extract', { text });
-    return r.data;
-  }
 
   /**
    * Full Concept Studio pipeline: extract → personalized card + visualization.

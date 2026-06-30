@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { latticeClient } from '@/api/client';
-import { ConceptExtractionResponse, ConceptExplanationResponse } from '@/types';
+import { ConceptExplanationResponse } from '@/types';
 import LearningCard from './LearningCard';
 
 const EXAMPLES = [
@@ -16,14 +16,11 @@ const EXAMPLES = [
 export default function ConceptStudio() {
   const router                              = useRouter();
   const [inputText, setInputText]           = useState('');
-  const [extraction, setExtraction]         = useState<ConceptExtractionResponse | null>(null);
-  const [isExtracting, setIsExtracting]     = useState(false);
   const [explanation, setExplanation]       = useState<ConceptExplanationResponse | null>(null);
   const [isExplaining, setIsExplaining]     = useState(false);
   const [isSaved, setIsSaved]               = useState(false);
   const [isSaving, setIsSaving]             = useState(false);
   const [error, setError]                   = useState<string | null>(null);
-  const debounceRef                         = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardRef                             = useRef<HTMLDivElement | null>(null);
 
   // Pre-fill from ?q= param (e.g. clicking "Open in Studio" from Atlas)
@@ -33,26 +30,6 @@ export default function ConceptStudio() {
       setInputText(q);
     }
   }, [router.query]);
-
-  // Debounced concept extraction as user types
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!inputText.trim()) { setExtraction(null); return; }
-
-    debounceRef.current = setTimeout(async () => {
-      setIsExtracting(true);
-      try {
-        const result = await latticeClient.extractConcept(inputText);
-        setExtraction(result);
-      } catch {
-        // extraction preview is optional — fail silently
-      } finally {
-        setIsExtracting(false);
-      }
-    }, 600);
-
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [inputText]);
 
   const handleLearn = async (overrideText?: string) => {
     const text = (overrideText ?? inputText).trim();
@@ -101,7 +78,6 @@ export default function ConceptStudio() {
   const handleExample = (ex: string) => {
     setInputText(ex);
     setExplanation(null);
-    setExtraction(null);
     setError(null);
   };
 
@@ -138,26 +114,8 @@ export default function ConceptStudio() {
                 onKeyDown={handleKeyDown}
                 placeholder="Enter a concept, question, or paste a paragraph…"
                 rows={5}
-                className="w-full resize-none text-sm text-gray-800 placeholder-gray-300 border-0 focus:outline-none focus:ring-0"
+                className="w-full resize-none text-sm text-gray-800 placeholder-gray-300 border-0 focus:outline-none focus:ring-0 mb-3"
               />
-
-              {/* Extraction preview */}
-              <div className="h-7 flex items-center mt-1 mb-3">
-                {isExtracting && (
-                  <span className="text-xs text-gray-400 animate-pulse">Identifying…</span>
-                )}
-                {!isExtracting && extraction && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-gray-700">{extraction.primary_concept}</span>
-                    <span className="text-xs px-1.5 py-0.5 bg-brand-100 text-brand-600 rounded-full">
-                      {extraction.domain}
-                    </span>
-                    {extraction.supporting_concepts.slice(0, 2).map((c) => (
-                      <span key={c} className="text-xs text-gray-400">{c}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
 
               <button
                 onClick={() => handleLearn()}
@@ -221,11 +179,6 @@ export default function ConceptStudio() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
                 </svg>
                 <p className="text-sm">Generating personalized explanation…</p>
-                {extraction && (
-                  <p className="text-xs text-gray-300 mt-1">
-                    {extraction.primary_concept} · {extraction.domain}
-                  </p>
-                )}
               </div>
             )}
             {explanation && !isExplaining && (
