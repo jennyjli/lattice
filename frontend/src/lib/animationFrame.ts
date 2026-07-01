@@ -25,6 +25,7 @@ export interface FActor {
   w?: number;
   h?: number;
   rotate?: number;
+  count?: number;
   sequence?: string;
   pam?: string;
   mutation_index?: number;
@@ -490,6 +491,31 @@ function fitLabel(
   return null;
 }
 
+// Auto-fit a label centered inside a shape's inscribed box (boxW × boxH around
+// cx,cy). Falls back to one line just below the shape when the text can't fit.
+function centeredLabel(
+  label: string | undefined,
+  cx: number,
+  cy: number,
+  boxW: number,
+  boxH: number,
+  belowY: number,
+  outsideColor: string,
+  insideColor = '#ffffff',
+): string {
+  if (!label) return '';
+  const fit = fitLabel(label, boxW, boxH);
+  if (!fit) {
+    return `<text x="${cx.toFixed(1)}" y="${belowY.toFixed(1)}" text-anchor="middle" font-size="12" font-weight="700" fill="${outsideColor}">${esc(label)}</text>`;
+  }
+  const lh = fit.fontSize * 1.18;
+  const top = cy - ((fit.lines.length - 1) * lh) / 2 + fit.fontSize * 0.34;
+  return fit.lines
+    .map((ln, i) =>
+      `<text x="${cx.toFixed(1)}" y="${(top + i * lh).toFixed(1)}" text-anchor="middle" font-size="${fit.fontSize}" font-weight="700" fill="${insideColor}">${esc(ln)}</text>`)
+    .join('');
+}
+
 function drawBox(a: FActor, st: ActorState, fx: ActorFx): string {
   if (st.opacity <= 0.01) return '';
   const cx = sx(st.x), cy = sy(st.y);
@@ -623,6 +649,160 @@ function drawGear(a: FActor, st: ActorState, fx: ActorFx): string {
   );
 }
 
+/** Node: a large labeled circle — a graph node, state, neuron, or entity. */
+function drawNode(a: FActor, st: ActorState, fx: ActorFx): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const r = (a.w ? wpx(a.w) / 2 : 30) * st.scale;
+  const c = a.color ?? '#6366f1';
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  out.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${c}" stroke="#0f172a" stroke-opacity="0.15"/>`);
+  if (fx.fill > 0) {  // radial "activation" fill
+    out.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(r * fx.fill).toFixed(1)}" fill="#ffffff" opacity="0.22"/>`);
+  }
+  out.push(`<ellipse cx="${(cx - r * 0.32).toFixed(1)}" cy="${(cy - r * 0.36).toFixed(1)}" rx="${(r * 0.3).toFixed(1)}" ry="${(r * 0.22).toFixed(1)}" fill="#ffffff" opacity="0.25"/>`);
+  out.push(centeredLabel(a.label, cx, cy, r * 1.4, r * 1.4, cy + r + 14, c));
+  out.push('</g>');
+  return out.join('');
+}
+
+/** Hexagon: a module/service/unit — a non-rectangular container. */
+function drawHexagon(a: FActor, st: ActorState): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const w = wpx(a.w ?? 22) * st.scale, h = hpx(a.h ?? 16) * st.scale;
+  const c = a.color ?? '#0ea5e9';
+  const hw = w / 2, hh = h / 2, inset = hw * 0.5;
+  const pts = [
+    [cx - hw, cy], [cx - inset, cy - hh], [cx + inset, cy - hh],
+    [cx + hw, cy], [cx + inset, cy + hh], [cx - inset, cy + hh],
+  ].map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  out.push(`<polygon points="${pts}" fill="${c}" stroke="#0f172a" stroke-opacity="0.18"/>`);
+  out.push(centeredLabel(a.label, cx, cy, w * 0.7, h * 0.8, cy + hh + 14, c));
+  out.push('</g>');
+  return out.join('');
+}
+
+/** Diamond: a decision / branch / gate in a flow. */
+function drawDiamond(a: FActor, st: ActorState): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const w = wpx(a.w ?? 20) * st.scale, h = hpx(a.h ?? 18) * st.scale;
+  const c = a.color ?? '#f59e0b';
+  const hw = w / 2, hh = h / 2;
+  const pts = [[cx, cy - hh], [cx + hw, cy], [cx, cy + hh], [cx - hw, cy]]
+    .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  out.push(`<polygon points="${pts}" fill="${c}" stroke="#0f172a" stroke-opacity="0.18"/>`);
+  out.push(centeredLabel(a.label, cx, cy, w * 0.55, h * 0.55, cy + hh + 14, c));
+  out.push('</g>');
+  return out.join('');
+}
+
+/** Database: a vertical cylinder — a data store / table / repository. */
+function drawDatabase(a: FActor, st: ActorState): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const w = wpx(a.w ?? 16) * st.scale, h = hpx(a.h ?? 22) * st.scale;
+  const c = a.color ?? '#0d9488';
+  const rx = w / 2, ry = Math.min(w * 0.22, h * 0.28);
+  const top = cy - h / 2, bot = cy + h / 2;
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  // body + curved bottom + top disk
+  out.push(`<path d="M ${(cx - rx).toFixed(1)},${top.toFixed(1)} L ${(cx - rx).toFixed(1)},${bot.toFixed(1)} A ${rx.toFixed(1)} ${ry.toFixed(1)} 0 0 0 ${(cx + rx).toFixed(1)},${bot.toFixed(1)} L ${(cx + rx).toFixed(1)},${top.toFixed(1)} Z" fill="${c}"/>`);
+  out.push(`<ellipse cx="${cx.toFixed(1)}" cy="${top.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="${c}" stroke="#ffffff" stroke-opacity="0.4"/>`);
+  // banding rings suggest stacked records
+  for (let i = 1; i <= 2; i++) {
+    const ry2 = top + (h * i) / 3;
+    out.push(`<path d="M ${(cx - rx).toFixed(1)},${ry2.toFixed(1)} A ${rx.toFixed(1)} ${ry.toFixed(1)} 0 0 0 ${(cx + rx).toFixed(1)},${ry2.toFixed(1)}" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.5"/>`);
+  }
+  out.push(labelBelow(a, cx, bot + ry + 16, c));
+  out.push('</g>');
+  return out.join('');
+}
+
+/** Cloud: an external system / service / the internet. */
+function drawCloud(a: FActor, st: ActorState): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const w = wpx(a.w ?? 26) * st.scale, h = hpx(a.h ?? 16) * st.scale;
+  const c = a.color ?? '#64748b';
+  const rw = w / 2;
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  // three overlapping puffs over a rounded base read as a cloud
+  out.push(`<g fill="${c}">`);
+  out.push(`<ellipse cx="${(cx - rw * 0.45).toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(rw * 0.4).toFixed(1)}" ry="${(h * 0.42).toFixed(1)}"/>`);
+  out.push(`<ellipse cx="${(cx + rw * 0.45).toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(rw * 0.4).toFixed(1)}" ry="${(h * 0.42).toFixed(1)}"/>`);
+  out.push(`<ellipse cx="${cx.toFixed(1)}" cy="${(cy - h * 0.22).toFixed(1)}" rx="${(rw * 0.5).toFixed(1)}" ry="${(h * 0.55).toFixed(1)}"/>`);
+  out.push(`<rect x="${(cx - rw * 0.75).toFixed(1)}" y="${cy.toFixed(1)}" width="${(rw * 1.5).toFixed(1)}" height="${(h * 0.42).toFixed(1)}" rx="${(h * 0.2).toFixed(1)}"/>`);
+  out.push('</g>');
+  out.push(centeredLabel(a.label, cx, cy, w * 0.7, h * 0.7, cy + h * 0.42 + 16, c));
+  out.push('</g>');
+  return out.join('');
+}
+
+/** Person: a user / agent / actor. */
+function drawPerson(a: FActor, st: ActorState): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const s = st.scale, c = a.color ?? '#7c3aed';
+  const headR = 9 * s;
+  const headY = cy - 12 * s;
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  out.push(`<circle cx="${cx.toFixed(1)}" cy="${headY.toFixed(1)}" r="${headR.toFixed(1)}" fill="${c}"/>`);
+  // shoulders/torso as a rounded shape rising from below
+  out.push(`<path d="M ${(cx - 15 * s).toFixed(1)},${(cy + 16 * s).toFixed(1)} Q ${cx.toFixed(1)},${(cy - 6 * s).toFixed(1)} ${(cx + 15 * s).toFixed(1)},${(cy + 16 * s).toFixed(1)} Z" fill="${c}"/>`);
+  out.push(labelBelow(a, cx, cy + 16 * s + 15, c));
+  out.push('</g>');
+  return out.join('');
+}
+
+/** Wave: a signal / oscillation — scrolls with time. */
+function drawWave(a: FActor, st: ActorState, t: number): string {
+  if (st.opacity <= 0.01) return '';
+  const x0 = a.span ? sx(a.span[0]) : sx(st.x) - wpx(a.w ?? 40) / 2;
+  const x1 = a.span ? sx(a.span[1]) : x0 + wpx(a.w ?? 40);
+  const yc = sy(st.y);
+  const amp = Math.max(6, hpx(a.h ?? 12) / 2) * st.scale;
+  const period = 90;
+  const phase = t * 2.2;
+  const pts: string[] = [];
+  for (let x = x0; x <= x1; x += 5) {
+    const y = yc + amp * Math.sin((2 * Math.PI * (x - x0)) / period + phase);
+    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  const c = a.color ?? '#0ea5e9';
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  out.push(`<path d="M ${pts.join(' L ')}" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round"/>`);
+  if (a.label) out.push(`<text x="${(x0 + 2).toFixed(1)}" y="${(yc - amp - 8).toFixed(1)}" font-size="13" font-weight="700" fill="${c}">${esc(a.label)}</text>`);
+  out.push('</g>');
+  return out.join('');
+}
+
+/** Stack: a set of layered plates — NN layers, protocol stacks, tiers. */
+function drawStack(a: FActor, st: ActorState): string {
+  if (st.opacity <= 0.01) return '';
+  const cx = sx(st.x), cy = sy(st.y);
+  const w = wpx(a.w ?? 28) * st.scale, h = hpx(a.h ?? 22) * st.scale;
+  const c = a.color ?? '#8b5cf6';
+  const n = Math.max(2, Math.min(6, Math.round(a.count ?? 3)));
+  const plateH = (h / n) * 0.78;
+  const gap = n > 1 ? (h - plateH) / (n - 1) : 0;
+  const x = cx - w / 2, top = cy - h / 2;
+  const out = [`<g data-actor="${a.id}" opacity="${st.opacity.toFixed(2)}">`];
+  for (let i = 0; i < n; i++) {
+    const y = top + i * gap;
+    // slightly lighter toward the top for depth
+    const op = (0.72 + 0.28 * (i / Math.max(1, n - 1))).toFixed(2);
+    out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${plateH.toFixed(1)}" rx="4" fill="${c}" opacity="${op}" stroke="#0f172a" stroke-opacity="0.12"/>`);
+    out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${(plateH * 0.3).toFixed(1)}" rx="4" fill="#ffffff" opacity="0.15"/>`);
+  }
+  out.push(labelBelow(a, cx, cy + h / 2 + 16, c));
+  out.push('</g>');
+  return out.join('');
+}
+
 function drawActor(spec: FSpec, a: FActor, t: number, proc: Proc): string {
   const st = actorStateAt(spec, a, t);
   const fx = actorFx(spec, a, t);
@@ -633,6 +813,14 @@ function drawActor(spec: FSpec, a: FActor, t: number, proc: Proc): string {
     case 'ground': return drawGround(a, st);
     case 'arrow': return drawArrow(a, st, fx);
     case 'gear': return drawGear(a, st, fx);
+    case 'node': return drawNode(a, st, fx);
+    case 'hexagon': return drawHexagon(a, st);
+    case 'diamond': return drawDiamond(a, st);
+    case 'database': return drawDatabase(a, st);
+    case 'cloud': return drawCloud(a, st);
+    case 'person': return drawPerson(a, st);
+    case 'wave': return drawWave(a, st, t);
+    case 'stack': return drawStack(a, st);
     case 'double_helix': return drawDNA(a, st, proc);
     case 'protein': return drawProtein(a, st, proc);
     case 'strand': return drawStrand(a, st, proc);

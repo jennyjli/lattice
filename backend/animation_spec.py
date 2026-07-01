@@ -32,6 +32,14 @@ Shape = Literal[
     "gear",           # gear/machine — mechanical processes (spin with `rotate`)
     "molecule",       # small circle / node / particle / generic entity
     "label",          # free-floating text callout
+    "node",           # large labeled circle — graph node, state, neuron, entity
+    "hexagon",        # module/service/unit — a non-rectangular container
+    "diamond",        # decision / branch / gate in a flow
+    "database",       # vertical cylinder — data store / table / repository
+    "cloud",          # external system / service / the internet
+    "person",         # a user / agent / actor
+    "wave",           # a signal / oscillation (spans `span` or `w`, animates)
+    "stack",          # layered plates — NN layers, protocol stacks, tiers (`count`)
     # ── Molecular-biology specializations ──
     "double_helix",   # DNA/RNA duplex spanning `span` (can carry a `sequence`)
     "protein",        # enzyme/protein — drawn as a clamp that can grip & snap
@@ -72,6 +80,7 @@ class Actor(BaseModel):
     w: Optional[float] = None                # width in normalized units (box/cylinder/fluid)
     h: Optional[float] = None                # height in normalized units (box/cylinder/fluid)
     rotate: Optional[float] = None           # base orientation in degrees (arrow/gear)
+    count: Optional[int] = None              # number of plates in a `stack` (2–6)
     sequence: Optional[str] = None           # nucleotide letters, e.g. "GACTTGCCA"
     pam: Optional[str] = None                # PAM codon to call out, e.g. "TGG"
     mutation_index: Optional[int] = None     # index into `sequence` to flag as the mutation

@@ -57,6 +57,27 @@ GENERAL SHAPES (any domain):
 - "gear": a gear/machine for mechanical processes. Set `at`, `w` (diameter).
 - "molecule": a small circle — a generic node, particle, or entity. Set `at`.
 - "label": a free-floating text callout. Set `at`, `label`.
+- "node": a LARGE labeled circle — a graph node, state machine state, neuron, or
+  entity. Set `at`, `w` (diameter). Prefer this over `box` for anything round or
+  for nodes in a network/graph.
+- "hexagon": a module / service / processing unit — a non-rectangular container.
+  Set `at`, `w`, `h`. Use it to break up rows of boxes in system diagrams.
+- "diamond": a decision, branch, or gate in a flow/algorithm. Set `at`, `w`, `h`.
+- "database": a vertical cylinder — a data store, table, cache, or repository.
+  Set `at`, `w`, `h`.
+- "cloud": an external system, third-party service, or "the internet". Set `at`, `w`, `h`.
+- "person": a user, agent, or actor interacting with the system. Set `at`.
+- "wave": a signal / oscillation / waveform (sound, light, EM, voltage). Set
+  `span` (or `w`) and `h` (amplitude); it animates on its own.
+- "stack": layered plates — neural-network layers, a protocol/OSI stack, storage
+  tiers. Set `at`, `w`, `h`, and `count` (2–6 layers).
+
+DON'T default to `box` for everything — that makes every diagram look the same.
+Choose the primitive that best MATCHES each object: `node` for graph/network
+nodes and states, `database` for stores, `cloud` for external services, `person`
+for users/agents, `stack` for layers, `hexagon` for services/modules, `diamond`
+for decisions, `wave` for signals. Reserve `box` for genuinely rectangular things
+(files, blocks, buildings, containers holding other parts).
 
 MOLECULAR-BIOLOGY SHAPES (only for molecular/genetic concepts):
 - "double_helix": a DNA/RNA duplex. Set `span`; optionally `sequence`
@@ -308,6 +329,12 @@ no commentary."""
                 fix_scalar(a, k)
             for k in ("at", "span"):
                 fix_pair(a, k)
+            if "count" in a:                     # stack layer count → clean int
+                cnt = num(a["count"])
+                if cnt is None:
+                    a.pop("count")
+                else:
+                    a["count"] = int(round(cnt))
             actors.append(a)
         data["actors"] = actors
         actor_ids = {a["id"] for a in actors}
